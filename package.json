@@ -1,6 +1,21 @@
 {
-	"name": "9421",
-	"version": "0.0.0",
+	"name": "http-message-signatures-demo",
+	"version": "1.0.0",
+	"description": "⚠️ DEMO TOOL: HTTP Message Signatures (RFC 9421) verification demo for testing and learning. NOT for production use.",
+	"keywords": [
+		"http-signatures",
+		"rfc9421",
+		"demo",
+		"testing",
+		"cloudflare-workers",
+		"cryptography",
+		"message-signing",
+		"signature-verification",
+		"ecdsa",
+		"ed25519",
+		"rsa",
+		"hmac"
+	],
 	"private": true,
 	"scripts": {
 		"deploy": "wrangler deploy",
@@ -10,7 +25,9 @@
 		"cf-typegen": "wrangler types"
 	},
 	"devDependencies": {
+		"@cloudflare/vitest-pool-workers": "^0.5.0",
 		"@types/node": "^24",
+		"vitest": "^2.1.0",
 		"wrangler": "^4.56.0"
 	},
 	"dependencies": {
