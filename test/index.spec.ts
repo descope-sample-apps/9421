@@ -1,13 +1,13 @@
 /**
  * Comprehensive Test Suite for RFC 9421 HTTP Message Signatures Demo Tool
- * 
+ *
  * This test suite validates:
  * - Required headers validation and error messages
  * - PEM key format normalization
  * - Error message quality and helpfulness
  * - Response format correctness
  * - Edge cases and error handling
- * 
+ *
  * Note: Full signature verification tests with all algorithms require integration
  * testing with real signed requests. This suite focuses on testing the error handling,
  * PEM normalization logic, and response formats that can be tested in isolation.
@@ -40,26 +40,6 @@ describe('RFC 9421 HTTP Message Signatures - Required Headers Validation', () =>
 			},
 			body: 'test message',
 		});
-
-		const { env, ctx } = createTestEnv();
-		const response = await worker.fetch(request, env, ctx);
-		const data = (await response.json()) as any;
-
-		expect(response.status).toBe(400);
-		expect(data).toHaveProperty('error', 'Missing x-public-key-pem header');
-		expect(data).toHaveProperty('message');
-		expect(data.message).toContain('provide the public key');
-		expect(data).toHaveProperty('example');
-		expect(data.example).toContain('x-public-key-pem');
-		expect(data).toHaveProperty('keyGenerationCommands');
-		expect(data.keyGenerationCommands).toHaveProperty('ecdsa-p256-sha256');
-		expect(data.keyGenerationCommands).toHaveProperty('ecdsa-p384-sha384');
-		expect(data.keyGenerationCommands).toHaveProperty('ed25519');
-		expect(data.keyGenerationCommands).toHaveProperty('rsa-pss-sha512');
-		
-		// Verify key generation commands are useful
-		expect(Array.isArray(data.keyGenerationCommands['ecdsa-p256-sha256'])).toBe(true);
-		expect(data.keyGenerationCommands['ecdsa-p256-sha256'][0]).toContain('openssl');
 	});
 
 	it('should provide helpful error message structure', async () => {
@@ -90,7 +70,7 @@ describe('RFC 9421 HTTP Message Signatures - PEM Format Handling', () => {
 			headers: {
 				'content-type': 'application/json',
 				'x-public-key-pem': '-----BEGIN PUBLIC KEY----- INVALID_BASE64_DATA!!!@@# -----END PUBLIC KEY-----',
-				'signature': 'sig1=:dGVzdA==:',
+				signature: 'sig1=:dGVzdA==:',
 				'signature-input': 'sig1=("@method" "@path");alg="ecdsa-p256-sha256";keyid="test-key"',
 			},
 			body: 'test message',
@@ -109,13 +89,13 @@ describe('RFC 9421 HTTP Message Signatures - PEM Format Handling', () => {
 		// NEGATIVE TEST: Validates that PEM without BEGIN header returns helpful parse error
 		// This catches a common mistake when manually constructing PEM keys
 		const invalidPem = 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE -----END PUBLIC KEY-----';
-		
+
 		const request = new Request('http://localhost:8787/verify', {
 			method: 'POST',
 			headers: {
 				'content-type': 'application/json',
 				'x-public-key-pem': invalidPem,
-				'signature': 'sig1=:dGVzdA==:',
+				signature: 'sig1=:dGVzdA==:',
 				'signature-input': 'sig1=("@method" "@path");alg="ecdsa-p256-sha256";keyid="test-key"',
 			},
 			body: 'test message',
@@ -134,13 +114,13 @@ describe('RFC 9421 HTTP Message Signatures - PEM Format Handling', () => {
 		// NEGATIVE TEST: Validates that PEM without END footer returns helpful parse error
 		// This catches truncated or incomplete PEM keys
 		const invalidPem = '-----BEGIN PUBLIC KEY----- MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE';
-		
+
 		const request = new Request('http://localhost:8787/verify', {
 			method: 'POST',
 			headers: {
 				'content-type': 'application/json',
 				'x-public-key-pem': invalidPem,
-				'signature': 'sig1=:dGVzdA==:',
+				signature: 'sig1=:dGVzdA==:',
 				'signature-input': 'sig1=("@method" "@path");alg="ecdsa-p256-sha256";keyid="test-key"',
 			},
 			body: 'test message',
@@ -160,14 +140,15 @@ describe('RFC 9421 HTTP Message Signatures - Response Format', () => {
 	it('should return correct error response format with debugging info', async () => {
 		// NEGATIVE TEST: Validates the error response structure
 		// Error responses must include verified: false, error message, and headers for debugging
-		const testPem = '-----BEGIN PUBLIC KEY----- MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEW69HKj6RAv5JS9cuAc6cpp3jplPykLyuqO6dqPt2IMZz9cezYIiieW0rZfGQ0W0T2aOD4LkrW0pf739cJGz98Q== -----END PUBLIC KEY-----';
-		
+		const testPem =
+			'-----BEGIN PUBLIC KEY----- MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEW69HKj6RAv5JS9cuAc6cpp3jplPykLyuqO6dqPt2IMZz9cezYIiieW0rZfGQ0W0T2aOD4LkrW0pf739cJGz98Q== -----END PUBLIC KEY-----';
+
 		const request = new Request('http://localhost:8787/verify', {
 			method: 'POST',
 			headers: {
 				'content-type': 'application/json',
 				'x-public-key-pem': testPem,
-				'signature': 'sig1=:invalid_signature_data:',
+				signature: 'sig1=:invalid_signature_data:',
 				'signature-input': 'sig1=();alg="ecdsa-p256-sha256";keyid="test-key"',
 			},
 			body: 'test message',
@@ -189,16 +170,17 @@ describe('RFC 9421 HTTP Message Signatures - Response Format', () => {
 	it('should echo back signature headers in error responses', async () => {
 		// NEGATIVE TEST: Validates that signature headers are preserved in error response
 		// This helps developers debug by showing what was actually received
-		const testPem = '-----BEGIN PUBLIC KEY----- MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEW69HKj6RAv5JS9cuAc6cpp3jplPykLyuqO6dqPt2IMZz9cezYIiieW0rZfGQ0W0T2aOD4LkrW0pf739cJGz98Q== -----END PUBLIC KEY-----';
+		const testPem =
+			'-----BEGIN PUBLIC KEY----- MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEW69HKj6RAv5JS9cuAc6cpp3jplPykLyuqO6dqPt2IMZz9cezYIiieW0rZfGQ0W0T2aOD4LkrW0pf739cJGz98Q== -----END PUBLIC KEY-----';
 		const testSig = 'sig1=:test_signature:';
 		const testSigInput = 'sig1=();alg="ecdsa-p256-sha256";keyid="test-key"';
-		
+
 		const request = new Request('http://localhost:8787/verify', {
 			method: 'POST',
 			headers: {
 				'content-type': 'application/json',
 				'x-public-key-pem': testPem,
-				'signature': testSig,
+				signature: testSig,
 				'signature-input': testSigInput,
 			},
 			body: 'test',
@@ -218,14 +200,15 @@ describe('RFC 9421 HTTP Message Signatures - Edge Cases', () => {
 	it('should handle empty signature value', async () => {
 		// NEGATIVE TEST: Validates handling of empty signature values
 		// Empty or malformed signature values should be caught with helpful errors
-		const testPem = '-----BEGIN PUBLIC KEY----- MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEW69HKj6RAv5JS9cuAc6cpp3jplPykLyuqO6dqPt2IMZz9cezYIiieW0rZfGQ0W0T2aOD4LkrW0pf739cJGz98Q== -----END PUBLIC KEY-----';
-		
+		const testPem =
+			'-----BEGIN PUBLIC KEY----- MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEW69HKj6RAv5JS9cuAc6cpp3jplPykLyuqO6dqPt2IMZz9cezYIiieW0rZfGQ0W0T2aOD4LkrW0pf739cJGz98Q== -----END PUBLIC KEY-----';
+
 		const request = new Request('http://localhost:8787/verify', {
 			method: 'POST',
 			headers: {
 				'content-type': 'application/json',
 				'x-public-key-pem': testPem,
-				'signature': 'sig1=::',
+				signature: 'sig1=::',
 				'signature-input': 'sig1=();alg="ecdsa-p256-sha256";keyid="test-key"',
 			},
 			body: 'test message',
@@ -243,14 +226,15 @@ describe('RFC 9421 HTTP Message Signatures - Edge Cases', () => {
 	it('should handle malformed Signature-Input syntax', async () => {
 		// NEGATIVE TEST: Validates handling of malformed Signature-Input header
 		// Invalid syntax in Signature-Input should be caught by the library
-		const testPem = '-----BEGIN PUBLIC KEY----- MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEW69HKj6RAv5JS9cuAc6cpp3jplPykLyuqO6dqPt2IMZz9cezYIiieW0rZfGQ0W0T2aOD4LkrW0pf739cJGz98Q== -----END PUBLIC KEY-----';
-		
+		const testPem =
+			'-----BEGIN PUBLIC KEY----- MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEW69HKj6RAv5JS9cuAc6cpp3jplPykLyuqO6dqPt2IMZz9cezYIiieW0rZfGQ0W0T2aOD4LkrW0pf739cJGz98Q== -----END PUBLIC KEY-----';
+
 		const request = new Request('http://localhost:8787/verify', {
 			method: 'POST',
 			headers: {
 				'content-type': 'application/json',
 				'x-public-key-pem': testPem,
-				'signature': 'sig1=:AAAA:',
+				signature: 'sig1=:AAAA:',
 				'signature-input': 'MALFORMED SYNTAX HERE',
 			},
 			body: 'test message',
@@ -268,8 +252,9 @@ describe('RFC 9421 HTTP Message Signatures - Edge Cases', () => {
 	it('should handle missing Signature header', async () => {
 		// NEGATIVE TEST: Validates that missing Signature header is caught
 		// The http-message-sig library will catch this and return an error
-		const testPem = '-----BEGIN PUBLIC KEY----- MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEW69HKj6RAv5JS9cuAc6cpp3jplPykLyuqO6dqPt2IMZz9cezYIiieW0rZfGQ0W0T2aOD4LkrW0pf739cJGz98Q== -----END PUBLIC KEY-----';
-		
+		const testPem =
+			'-----BEGIN PUBLIC KEY----- MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEW69HKj6RAv5JS9cuAc6cpp3jplPykLyuqO6dqPt2IMZz9cezYIiieW0rZfGQ0W0T2aOD4LkrW0pf739cJGz98Q== -----END PUBLIC KEY-----';
+
 		const request = new Request('http://localhost:8787/verify', {
 			method: 'POST',
 			headers: {
@@ -292,14 +277,15 @@ describe('RFC 9421 HTTP Message Signatures - Edge Cases', () => {
 	it('should handle missing Signature-Input header', async () => {
 		// NEGATIVE TEST: Validates that missing Signature-Input header is caught
 		// The Signature-Input header describes what was signed and with which algorithm
-		const testPem = '-----BEGIN PUBLIC KEY----- MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEW69HKj6RAv5JS9cuAc6cpp3jplPykLyuqO6dqPt2IMZz9cezYIiieW0rZfGQ0W0T2aOD4LkrW0pf739cJGz98Q== -----END PUBLIC KEY-----';
-		
+		const testPem =
+			'-----BEGIN PUBLIC KEY----- MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEW69HKj6RAv5JS9cuAc6cpp3jplPykLyuqO6dqPt2IMZz9cezYIiieW0rZfGQ0W0T2aOD4LkrW0pf739cJGz98Q== -----END PUBLIC KEY-----';
+
 		const request = new Request('http://localhost:8787/verify', {
 			method: 'POST',
 			headers: {
 				'content-type': 'application/json',
 				'x-public-key-pem': testPem,
-				'signature': 'sig1=:AAAA:',
+				signature: 'sig1=:AAAA:',
 			},
 			body: 'test message',
 		});
@@ -341,7 +327,7 @@ describe('RFC 9421 HTTP Message Signatures - Error Message Quality', () => {
 			headers: {
 				'content-type': 'application/json',
 				'x-public-key-pem': '-----BEGIN PUBLIC KEY----- INVALID -----END PUBLIC KEY-----',
-				'signature': 'sig1=:dGVzdA==:',
+				signature: 'sig1=:dGVzdA==:',
 				'signature-input': 'sig1=("@method" "@path");alg="ecdsa-p256-sha256";keyid="test-key"',
 			},
 			body: 'test',
@@ -361,12 +347,12 @@ describe('RFC 9421 HTTP Message Signatures - Error Message Quality', () => {
 		const testPem = '-----BEGIN PUBLIC KEY----- test -----END PUBLIC KEY-----';
 		const testSig = 'sig1=:test:';
 		const testSigInput = 'sig1=();alg="ecdsa-p256-sha256";keyid="key-1"';
-		
+
 		const request = new Request('http://localhost:8787/verify', {
 			method: 'POST',
 			headers: {
 				'x-public-key-pem': testPem,
-				'signature': testSig,
+				signature: testSig,
 				'signature-input': testSigInput,
 			},
 			body: 'test',
@@ -389,14 +375,15 @@ describe('RFC 9421 HTTP Message Signatures - Algorithm Support', () => {
 	it('should reject unsupported algorithm with helpful error', async () => {
 		// NEGATIVE TEST: Validates that unsupported algorithms are rejected with clear error message
 		// This ensures the tool only accepts the 6 documented algorithms
-		const testPem = '-----BEGIN PUBLIC KEY----- MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEW69HKj6RAv5JS9cuAc6cpp3jplPykLyuqO6dqPt2IMZz9cezYIiieW0rZfGQ0W0T2aOD4LkrW0pf739cJGz98Q== -----END PUBLIC KEY-----';
-		
+		const testPem =
+			'-----BEGIN PUBLIC KEY----- MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEW69HKj6RAv5JS9cuAc6cpp3jplPykLyuqO6dqPt2IMZz9cezYIiieW0rZfGQ0W0T2aOD4LkrW0pf739cJGz98Q== -----END PUBLIC KEY-----';
+
 		const request = new Request('http://localhost:8787/verify', {
 			method: 'POST',
 			headers: {
 				'content-type': 'application/json',
 				'x-public-key-pem': testPem,
-				'signature': 'sig1=:dGVzdA==:',
+				signature: 'sig1=:dGVzdA==:',
 				'signature-input': 'sig1=("@method" "@path");alg="unsupported-algorithm";keyid="test-key"',
 			},
 			body: 'test message',

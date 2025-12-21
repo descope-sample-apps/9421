@@ -7,12 +7,14 @@
 **This tool accepts public keys from client headers, which is DANGEROUS in production environments.**
 
 **Use this ONLY for:**
+
 - 🧪 Testing HTTP signature implementations
 - 📚 Learning RFC 9421 concepts
 - 🔍 Debugging signature generation
 - 🛠️ Local development and CI/CD testing
 
 **DO NOT use this for:**
+
 - ❌ Production authentication
 - ❌ Real API security
 - ❌ Sensitive data protection
@@ -39,7 +41,7 @@
 
 ## What is This?
 
-This is a **demo Cloudflare Worker** that verifies HTTP Message Signatures according to [RFC 9421](https://www.rfc-editor.org/rfc/rfc9421.html). It helps developers:
+This is a **demo service** that verifies HTTP Message Signatures according to [RFC 9421](https://www.rfc-editor.org/rfc/rfc9421.html). It helps developers:
 
 - ✅ Test their HTTP signature generation code
 - ✅ Learn how RFC 9421 signatures work
@@ -50,24 +52,27 @@ This is a **demo Cloudflare Worker** that verifies HTTP Message Signatures accor
 
 1. You create an HTTP request with a `Signature` and `Signature-Input` header (per RFC 9421)
 2. You include your public key in the `x-public-key-pem` header
-3. The worker verifies the signature and returns detailed results
+3. The service verifies the signature and returns detailed results
 4. You get immediate feedback on whether your implementation is correct
 
 ### Why This Design is Insecure for Production
 
 **The Security Flaw:**
-```
+
+```txt
 Client → Server: "Here's my request, my signature, AND my public key"
 Server: "Your signature matches your public key ✓"
 ```
 
 This only proves the client can sign with their private key. It **does NOT prove identity** because:
+
 - Anyone can generate a key pair
 - Anyone can send their own public key
 - There's no trust anchor or key registration
 
 **Production systems need:**
-- Server-side key storage (database, KV store, secrets manager)
+
+- Server-side key storage (database, key-value store, secrets manager)
 - Key ownership verification (registration, CA certificates)
 - Identity binding (keys linked to authenticated users/services)
 
@@ -86,7 +91,8 @@ This only proves the client can sign with their private key. It **does NOT prove
 Choose an algorithm and generate a key pair:
 
 **ECDSA P-256 (recommended for testing):**
-```bash
+
+```shell
 # Generate private key
 openssl ecparam -name prime256v1 -genkey -noout -out private-key.pem
 
@@ -98,38 +104,43 @@ cat public-key.pem
 ```
 
 **ECDSA P-384:**
-```bash
+
+```shell
 openssl ecparam -name secp384r1 -genkey -noout -out private-key.pem
 openssl ec -in private-key.pem -pubout -out public-key.pem
 ```
 
 **Ed25519:**
-```bash
+
+```shell
 openssl genpkey -algorithm ed25519 -out private-key.pem
 openssl pkey -in private-key.pem -pubout -out public-key.pem
 ```
 
 **RSA PSS (2048-bit):**
-```bash
+
+```shell
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out private-key.pem
 openssl rsa -in private-key.pem -pubout -out public-key.pem
 ```
 
 **RSA v1.5 (2048-bit):**
-```bash
+
+```shell
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out private-key.pem
 openssl rsa -in private-key.pem -pubout -out public-key.pem
 ```
 
 **HMAC SHA-256:**
-```bash
+
+```shell
 # Generate a random secret (32 bytes for SHA-256)
 openssl rand -base64 32 > hmac-secret.txt
 ```
 
 ### 2. Create a Signed Request
 
-Use a library like [`http-message-signatures`](https://github.com/christianjeller/http-message-sig) to sign your request.
+Use a library like [`http-message-sig`](https://github.com/cloudflare/web-bot-auth/tree/main/packages/http-message-sig) to sign your request.
 
 **Example with Node.js:**
 
@@ -142,21 +153,21 @@ import { readFileSync } from 'fs';
 const privateKey = createPrivateKey(readFileSync('private-key.pem'));
 
 // Create a request
-const request = new Request('https://your-worker.workers.dev/', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'x-public-key-pem': readFileSync('public-key.pem', 'utf8')
-  },
-  body: JSON.stringify({ test: 'data' })
+const request = new Request('https://your-service.example.com/', {
+ method: 'POST',
+ headers: {
+  'Content-Type': 'application/json',
+  'x-public-key-pem': readFileSync('public-key.pem', 'utf8'),
+ },
+ body: JSON.stringify({ test: 'data' }),
 });
 
 // Sign the request
 await sign(request, {
-  privateKey,
-  algorithm: 'ecdsa-p256-sha256',
-  keyId: 'test-key-1',
-  components: ['@method', '@path', '@authority', 'content-type']
+ privateKey,
+ algorithm: 'ecdsa-p256-sha256',
+ keyId: 'test-key-1',
+ components: ['@method', '@path', '@authority', 'content-type'],
 });
 
 // Send the signed request
@@ -169,8 +180,8 @@ console.log(result);
 
 **Example with curl (manual signature - for illustration):**
 
-```bash
-curl -X POST https://your-worker.workers.dev/ \
+```shell
+curl -X POST https://your-service.example.com/ \
   -H "Content-Type: application/json" \
   -H "x-public-key-pem: $(cat public-key.pem | tr -d '\n')" \
   -H 'Signature-Input: sig1=("@method" "@path" "@authority" "content-type");created=1618884473;keyid="test-key-1";alg="ecdsa-p256-sha256"' \
@@ -181,23 +192,25 @@ curl -X POST https://your-worker.workers.dev/ \
 ### 4. Interpret Results
 
 **Success Response (200):**
+
 ```json
 {
-  "verified": true,
-  "Signature": "sig1=:MEUCIQDzE...:=",
-  "Signature-Input": "sig1=(\"@method\" \"@path\" \"@authority\" \"content-type\");created=1618884473;keyid=\"test-key-1\";alg=\"ecdsa-p256-sha256\"",
-  "pemKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE..."
+ "verified": true,
+ "Signature": "sig1=:MEUCIQDzE...:=",
+ "Signature-Input": "sig1=(\"@method\" \"@path\" \"@authority\" \"content-type\");created=1618884473;keyid=\"test-key-1\";alg=\"ecdsa-p256-sha256\"",
+ "pemKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE..."
 }
 ```
 
 **Failure Response (400):**
+
 ```json
 {
-  "verified": false,
-  "error": "Invalid signature",
-  "Signature": "sig1=:MEUCIQDzE...:=",
-  "Signature-Input": "sig1=(\"@method\" \"@path\" \"@authority\" \"content-type\");created=1618884473;keyid=\"test-key-1\";alg=\"ecdsa-p256-sha256\"",
-  "pemKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE..."
+ "verified": false,
+ "error": "Invalid signature",
+ "Signature": "sig1=:MEUCIQDzE...:=",
+ "Signature-Input": "sig1=(\"@method\" \"@path\" \"@authority\" \"content-type\");created=1618884473;keyid=\"test-key-1\";alg=\"ecdsa-p256-sha256\"",
+ "pemKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE..."
 }
 ```
 
@@ -205,14 +218,14 @@ curl -X POST https://your-worker.workers.dev/ \
 
 ## Supported Algorithms
 
-| Algorithm | RFC 9421 Name | Hash Algorithm | Key Type | Key Size |
-|-----------|---------------|----------------|----------|----------|
-| **ECDSA P-256** | `ecdsa-p256-sha256` | SHA-256 | Elliptic Curve | 256-bit |
-| **ECDSA P-384** | `ecdsa-p384-sha384` | SHA-384 | Elliptic Curve | 384-bit |
-| **Ed25519** | `ed25519` | N/A (built-in) | Edwards Curve | 256-bit |
-| **RSA PSS** | `rsa-pss-sha512` | SHA-512 | RSA | 2048+ bit |
-| **RSA v1.5** | `rsa-v1_5-sha256` | SHA-256 | RSA | 2048+ bit |
-| **HMAC** | `hmac-sha256` | SHA-256 | Symmetric | 256+ bit |
+| Algorithm       | RFC 9421 Name       | Hash Algorithm | Key Type       | Key Size  |
+| --------------- | ------------------- | -------------- | -------------- | --------- |
+| **ECDSA P-256** | `ecdsa-p256-sha256` | SHA-256        | Elliptic Curve | 256-bit   |
+| **ECDSA P-384** | `ecdsa-p384-sha384` | SHA-384        | Elliptic Curve | 384-bit   |
+| **Ed25519**     | `ed25519`           | N/A (built-in) | Edwards Curve  | 256-bit   |
+| **RSA PSS**     | `rsa-pss-sha512`    | SHA-512        | RSA            | 2048+ bit |
+| **RSA v1.5**    | `rsa-v1_5-sha256`   | SHA-256        | RSA            | 2048+ bit |
+| **HMAC**        | `hmac-sha256`       | SHA-256        | Symmetric      | 256+ bit  |
 
 ### Algorithm Notes
 
@@ -232,11 +245,11 @@ See [Quick Start](#1-generate-test-keys) for detailed commands.
 
 ### Endpoint
 
-```
-POST/GET/PUT/DELETE/PATCH https://your-worker.workers.dev/*
+```http
+POST/GET/PUT/DELETE/PATCH https://your-service.example.com/*
 ```
 
-All HTTP methods are supported. The worker verifies signatures on any request.
+All HTTP methods are supported. The service verifies signatures on any request.
 
 ### Required Headers
 
@@ -247,47 +260,55 @@ All HTTP methods are supported. The worker verifies signatures on any request.
 The public key in PEM format. Can be provided in two formats:
 
 **Format 1: Multi-line (standard PEM):**
-```
+
+```pem
 -----BEGIN PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE...
 -----END PUBLIC KEY-----
 ```
 
 **Format 2: Single-line (URL-safe):**
-```
+
+```pem
 -----BEGIN PUBLIC KEY----- MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE... -----END PUBLIC KEY-----
 ```
 
-The worker automatically normalizes both formats.
+The service automatically normalizes both formats.
 
 #### `Signature`
 
 RFC 9421 signature header. Format:
-```
+
+```http
 Signature: <label>=:<base64-signature>:
 ```
 
 Example:
-```
+
+```http
 Signature: sig1=:MEUCIQDzE+123abc...:=
 ```
 
 #### `Signature-Input`
 
 RFC 9421 signature input header describing what was signed. Format:
-```
+
+```http
 Signature-Input: <label>=(<components>);<parameters>
 ```
 
 Example:
-```
+
+```http
 Signature-Input: sig1=("@method" "@path" "@authority" "content-type");created=1618884473;keyid="test-key-1";alg="ecdsa-p256-sha256"
 ```
 
 **Required parameters:**
+
 - `alg`: Algorithm name (must match [Supported Algorithms](#supported-algorithms))
 
 **Optional parameters:**
+
 - `keyid`: Key identifier (for your reference)
 - `created`: Unix timestamp when signature was created
 - `expires`: Unix timestamp when signature expires
@@ -320,9 +341,10 @@ Signature-Input: sig1=("@method" "@path" "@authority" "content-type");created=16
 ### Example Request/Response
 
 **Request:**
+
 ```http
 POST / HTTP/1.1
-Host: your-worker.workers.dev
+Host: your-service.example.com
 Content-Type: application/json
 x-public-key-pem: -----BEGIN PUBLIC KEY----- MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEXYS... -----END PUBLIC KEY-----
 Signature-Input: sig1=("@method" "@path" "@authority" "content-type");created=1618884473;keyid="test-key-1";alg="ecdsa-p256-sha256"
@@ -332,6 +354,7 @@ Signature: sig1=:MEUCIQDzE+hJKPwXcZKm...:=
 ```
 
 **Response (Success):**
+
 ```http
 HTTP/1.1 200 OK
 Content-Type: application/json
@@ -345,6 +368,7 @@ Content-Type: application/json
 ```
 
 **Response (Missing Public Key):**
+
 ```http
 HTTP/1.1 400 Bad Request
 Content-Type: application/json
@@ -373,7 +397,7 @@ Content-Type: application/json
 
 **Solution:** Add the `x-public-key-pem` header with your public key in PEM format:
 
-```bash
+```shell
 curl -H "x-public-key-pem: $(cat public-key.pem | tr -d '\n')" ...
 ```
 
@@ -382,20 +406,24 @@ curl -H "x-public-key-pem: $(cat public-key.pem | tr -d '\n')" ...
 **Cause:** The PEM format is invalid or corrupted.
 
 **Common Issues:**
+
 - Missing `-----BEGIN PUBLIC KEY-----` or `-----END PUBLIC KEY-----` markers
 - Extra whitespace or special characters
 - Wrong key type (private key instead of public key)
 - Encoding issues (not UTF-8)
 
 **Solution:**
+
 1. Verify your public key file:
-   ```bash
+
+   ```shell
    cat public-key.pem
    openssl pkey -pubin -in public-key.pem -text -noout
    ```
 
 2. Ensure you're sending the **public** key, not the private key:
-   ```bash
+
+   ```shell
    # Should start with "-----BEGIN PUBLIC KEY-----"
    head -1 public-key.pem
    ```
@@ -408,7 +436,7 @@ curl -H "x-public-key-pem: $(cat public-key.pem | tr -d '\n')" ...
 
 **Solution:** Ensure your `Signature-Input` header includes a supported algorithm:
 
-```
+```http
 Signature-Input: sig1=(...);alg="ecdsa-p256-sha256"
 ```
 
@@ -421,7 +449,8 @@ Supported algorithms: `ecdsa-p256-sha256`, `ecdsa-p384-sha384`, `ed25519`, `rsa-
 **Common Issues:**
 
 1. **Wrong components signed:** The components in `Signature-Input` don't match what was actually signed
-   ```
+
+   ```error
    # If you signed: @method, @path, content-type
    # Your Signature-Input must list exactly: "@method" "@path" "content-type"
    ```
@@ -437,10 +466,11 @@ Supported algorithms: `ecdsa-p256-sha256`, `ecdsa-p384-sha384`, `ed25519`, `rsa-
 **Debugging Steps:**
 
 1. **Verify key pair matches:**
-   ```bash
+
+   ```shell
    # Create test signature with private key
    echo "test" | openssl dgst -sha256 -sign private-key.pem | base64
-   
+
    # Verify with public key
    echo "test" | openssl dgst -sha256 -verify public-key.pem -signature <(echo "..." | base64 -d)
    ```
@@ -470,7 +500,7 @@ The worker accepts PEM keys in multiple formats:
 
 **✅ Valid Formats:**
 
-```
+```pem
 # Standard multi-line
 -----BEGIN PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE...
@@ -485,7 +515,7 @@ MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE...
 
 **❌ Invalid Formats:**
 
-```
+```pem
 # Missing markers
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE...
 
@@ -505,7 +535,7 @@ MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE...
 1. **Check the response:** The error message includes your signature headers for debugging
 2. **Test with a working example:** Use a known-good signing library
 3. **Verify RFC 9421 compliance:** Review the [RFC 9421 specification](https://www.rfc-editor.org/rfc/rfc9421.html)
-4. **Check server logs:** If deployed to Cloudflare, check the Workers logs for detailed errors
+4. **Check server logs:** Review server logs for detailed errors
 
 ---
 
@@ -529,7 +559,8 @@ To make this production-ready, you need to fundamentally change the architecture
 
 Instead of accepting keys from clients, store them server-side:
 
-**Option A: Cloudflare KV (for small key sets)**
+##### Option A: Key-Value Store (for small key sets)
+
 ```typescript
 // Store keys during registration
 await env.KEYS.put(`user:${userId}:public-key`, pemKey);
@@ -539,21 +570,20 @@ const userId = params.keyid; // From Signature-Input header
 const pemKey = await env.KEYS.get(`user:${userId}:public-key`);
 ```
 
-**Option B: Cloudflare D1 (for larger key sets with metadata)**
+##### Option B: Database (for larger key sets with metadata)
+
 ```typescript
 // Query during verification
-const result = await env.DB.prepare(
-  'SELECT public_key FROM keys WHERE key_id = ? AND active = 1'
-).bind(params.keyid).first();
+const result = await db.query('SELECT public_key FROM keys WHERE key_id = ? AND active = 1', [params.keyid]);
 ```
 
-**Option C: Environment Variables (for service-to-service)**
-```typescript
-// In wrangler.toml
-[vars]
-SERVICE_A_PUBLIC_KEY = "-----BEGIN PUBLIC KEY-----..."
+##### Option C: Environment Variables (for service-to-service)**
 
-// In worker
+```typescript
+// In configuration
+SERVICE_A_PUBLIC_KEY = '-----BEGIN PUBLIC KEY-----...';
+
+// In application
 const pemKey = env.SERVICE_A_PUBLIC_KEY;
 ```
 
@@ -562,24 +592,24 @@ const pemKey = env.SERVICE_A_PUBLIC_KEY;
 ```typescript
 // POST /register-key
 async function registerKey(request: Request, env: Env) {
-  // Authenticate the user first!
-  const userId = await authenticateUser(request);
-  
-  const { publicKey, keyId } = await request.json();
-  
-  // Validate the public key
-  try {
-    createPublicKey(publicKey);
-  } catch (err) {
-    return Response.json({ error: 'Invalid public key' }, { status: 400 });
-  }
-  
-  // Store in KV/D1
-  await env.KEYS.put(`user:${userId}:key:${keyId}`, publicKey, {
-    metadata: { createdAt: Date.now(), userId }
-  });
-  
-  return Response.json({ success: true, keyId });
+ // Authenticate the user first!
+ const userId = await authenticateUser(request);
+
+ const { publicKey, keyId } = await request.json();
+
+ // Validate the public key
+ try {
+  createPublicKey(publicKey);
+ } catch (err) {
+  return Response.json({ error: 'Invalid public key' }, { status: 400 });
+ }
+
+ // Store in KV/D1
+ await env.KEYS.put(`user:${userId}:key:${keyId}`, publicKey, {
+  metadata: { createdAt: Date.now(), userId },
+ });
+
+ return Response.json({ success: true, keyId });
 }
 ```
 
@@ -587,68 +617,64 @@ async function registerKey(request: Request, env: Env) {
 
 ```typescript
 async function verifyRequest(request: Request, env: Env) {
-  await verify(request, async (data, signature, params) => {
-    // Look up the key server-side
-    const pemKey = await env.KEYS.get(`user:${params.keyid}:public-key`);
-    
-    if (!pemKey) {
-      throw new Error('Unknown key ID');
-    }
-    
-    // Verify ownership (key belongs to authenticated user)
-    // Verify not revoked
-    // Verify not expired
-    
-    const publicKey = createPublicKey(pemKey);
-    const hashAlgorithm = algorithmMap[params.alg];
-    
-    const isValid = cryptoVerify(
-      hashAlgorithm,
-      Buffer.from(data),
-      publicKey,
-      signature
-    );
-    
-    if (!isValid) {
-      throw new Error('Invalid signature');
-    }
-  });
-  
-  // Don't echo sensitive data in response
-  return Response.json({ verified: true });
+ await verify(request, async (data, signature, params) => {
+  // Look up the key server-side
+  const pemKey = await env.KEYS.get(`user:${params.keyid}:public-key`);
+
+  if (!pemKey) {
+   throw new Error('Unknown key ID');
+  }
+
+  // Verify ownership (key belongs to authenticated user)
+  // Verify not revoked
+  // Verify not expired
+
+  const publicKey = createPublicKey(pemKey);
+  const hashAlgorithm = algorithmMap[params.alg];
+
+  const isValid = cryptoVerify(hashAlgorithm, Buffer.from(data), publicKey, signature);
+
+  if (!isValid) {
+   throw new Error('Invalid signature');
+  }
+ });
+
+ // Don't echo sensitive data in response
+ return Response.json({ verified: true });
 }
 ```
 
 #### 4. **Additional Security Measures**
 
 ```typescript
-// Rate limiting (Cloudflare Workers example)
+// Rate limiting
 const rateLimiter = new RateLimit({
-  maxRequests: 10,
-  windowMs: 60000
+ maxRequests: 10,
+ windowMs: 60000,
 });
 
 // Timestamp validation
 if (params.created) {
-  const age = Date.now() / 1000 - params.created;
-  if (age > 300) { // 5 minutes
-    throw new Error('Signature too old');
-  }
+ const age = Date.now() / 1000 - params.created;
+ if (age > 300) {
+  // 5 minutes
+  throw new Error('Signature too old');
+ }
 }
 
 // Nonce to prevent replay attacks
 const nonceUsed = await env.NONCES.get(params.nonce);
 if (nonceUsed) {
-  throw new Error('Nonce already used');
+ throw new Error('Nonce already used');
 }
 await env.NONCES.put(params.nonce, '1', { expirationTtl: 300 });
 
 // Audit logging
 await logVerification({
-  keyId: params.keyid,
-  timestamp: Date.now(),
-  success: true,
-  ip: request.headers.get('CF-Connecting-IP')
+ keyId: params.keyid,
+ timestamp: Date.now(),
+ success: true,
+ ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
 });
 ```
 
@@ -656,11 +682,11 @@ await logVerification({
 
 Instead of adapting this demo, consider these production solutions:
 
-1. **[Cloudflare Access](https://www.cloudflare.com/products/zero-trust/access/)** - Zero Trust authentication
-2. **[OAuth 2.0](https://oauth.net/2/)** - Industry-standard authorization
-3. **[JWT with RS256](https://jwt.io/)** - Signed JSON Web Tokens
-4. **[mTLS](https://www.cloudflare.com/learning/access-management/what-is-mutual-tls/)** - Mutual TLS certificate authentication
-5. **[API Gateways](https://developers.cloudflare.com/api-shield/)** - Managed API authentication
+1. **[OAuth 2.0](https://oauth.net/2/)** - Industry-standard authorization
+2. **[JWT with RS256](https://jwt.io/)** - Signed JSON Web Tokens
+3. **[mTLS](https://en.wikipedia.org/wiki/Mutual_authentication#mTLS)** - Mutual TLS certificate authentication
+4. **API Gateway Solutions** - Managed API authentication services
+5. **Zero Trust Solutions** - Modern authentication platforms
 
 ### When to Use HTTP Message Signatures in Production
 
@@ -672,6 +698,7 @@ HTTP Message Signatures (RFC 9421) are appropriate for:
 - ✅ **Government/financial systems** requiring non-repudiation
 
 Always with:
+
 - Server-side key storage and validation
 - Proper key lifecycle management
 - Audit logging and monitoring
@@ -684,58 +711,79 @@ Always with:
 ### Local Development
 
 1. **Install dependencies:**
-   ```bash
-   npm install
-   # or
-   pnpm install
-   ```
 
-2. **Start local dev server:**
-   ```bash
-   npm run dev
-   # or
-   pnpm dev
-   ```
+    ```shell
+    npm install
+    # or
+    pnpm install
+    ```
 
-   The worker will be available at `http://localhost:8787`
+1. **Start local dev server:**
 
-3. **Test locally:**
-   ```bash
-   # Generate test keys
-   openssl ecparam -name prime256v1 -genkey -noout -out test-private.pem
-   openssl ec -in test-private.pem -pubout -out test-public.pem
-   
-   # Use your signing library to test against localhost:8787
-   ```
+    ```shell
+    $ npm run dev
+    # or
+    $ pnpm dev
+    ```
+
+The service will be available at `http://localhost:8787`
+
+1. **Test locally:**
+
+    ```shell
+    # Generate test keys
+    openssl ecparam -name prime256v1 -genkey -noout -out test-private.pem
+    openssl ec -in test-private.pem -pubout -out test-public.pem
+
+    # Use your signing library to test against localhost:8787
+    ```
 
 ### Deployment
 
+This project includes configuration for deployment to Cloudflare Workers via Wrangler, but can be adapted to other platforms.
+
+#### Cloudflare Workers Deployment
+
 1. **Configure Wrangler:**
-   
-   Edit `wrangler.jsonc` to set your worker name:
-   ```jsonc
-   {
-     "name": "your-worker-name",
-     "main": "src/index.ts",
-     "compatibility_date": "2025-12-19"
-   }
-   ```
 
-2. **Deploy to Cloudflare:**
-   ```bash
-   npm run deploy
-   # or
-   pnpm deploy
-   ```
+Edit `wrangler.jsonc` to set your worker name:
 
-3. **Test deployment:**
-   ```bash
-   curl https://your-worker-name.workers.dev/
-   ```
+```jsonc
+{
+   "name": "your-worker-name",
+   "main": "src/index.ts",
+   "compatibility_date": "2025-12-19"
+}
+```
+
+1. **Deploy to Cloudflare:**
+
+```shell
+npm run deploy
+# or
+pnpm deploy
+```
+
+1. **Test deployment:**
+
+```shell
+curl https://your-worker-name.workers.dev/
+```
+
+#### Alternative Platforms
+
+This service can be deployed to any platform supporting Node.js-compatible runtimes:
+
+- **Node.js servers** - Express, Fastify, etc.
+- **Serverless platforms** - AWS Lambda, Google Cloud Functions, Azure Functions
+- **Edge runtimes** - Vercel Edge, Deno Deploy, Fastly Compute
+- **Container platforms** - Docker, Kubernetes
+
+Adapt the `fetch` handler to your platform's request/response format.
 
 ### Testing
 
-```bash
+```shell
 npm test
 # or
 pnpm test
@@ -743,11 +791,16 @@ pnpm test
 
 ### Project Structure
 
-```
+```shell
 .
 ├── src/
-│   └── index.ts          # Main worker code
-├── wrangler.jsonc        # Cloudflare Workers configuration
+│   ├── index.ts          # Main request handler
+│   ├── verification.ts   # Signature verification logic
+│   ├── config.ts         # Configuration and constants
+│   └── utils.ts          # Utility functions
+├── test/
+│   └── index.spec.ts     # Test suite
+├── wrangler.jsonc        # Cloudflare Workers config (optional)
 ├── package.json          # Dependencies and scripts
 ├── tsconfig.json         # TypeScript configuration
 └── README.md             # This file
@@ -755,9 +808,11 @@ pnpm test
 
 ### Environment
 
-- **Runtime:** Cloudflare Workers (V8 isolate)
-- **Node.js Compatibility:** `nodejs_compat_v2` flag enabled
+- **Runtime:** Compatible with Node.js and edge runtimes
+- **Node.js Compatibility:** Uses Node.js `crypto` module
 - **TypeScript:** Fully typed with `@types/node`
+
+Note: This project includes Cloudflare Workers configuration (`wrangler.jsonc`) but can run on any Node.js-compatible platform.
 
 ---
 
@@ -770,24 +825,24 @@ pnpm test
 
 ### Libraries
 
-- **[http-message-sig](https://github.com/christianjeller/http-message-sig)** - Library used by this worker
+- **[http-message-sig](https://github.com/christianjeller/http-message-sig)** - Library used by this service
 - **[node:crypto](https://nodejs.org/api/crypto.html)** - Node.js cryptography APIs
 
-### Cloudflare Workers
+### Related Tools & Platforms
 
-- **[Cloudflare Workers Docs](https://developers.cloudflare.com/workers/)** - Official documentation
-- **[Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/)** - Workers CLI tool
-- **[Workers Examples](https://developers.cloudflare.com/workers/examples/)** - Example workers
+- **[Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/)** - For Cloudflare Workers deployment (optional)
+- **[Express.js](https://expressjs.com/)** - For traditional Node.js server deployment
+- **[Fastify](https://www.fastify.io/)** - High-performance Node.js web framework
 
 ### Cryptography
 
 - **[OpenSSL Documentation](https://www.openssl.org/docs/)** - OpenSSL reference
-- **[Key Management Best Practices](https://www.cloudflare.com/learning/ssl/what-is-a-cryptographic-key/)** - Key security guide
+- **[Key Management Best Practices](https://en.wikipedia.org/wiki/Key_management)** - Key security guide
 
 ### Learning Resources
 
 - **[HTTP Message Signatures Explained](https://httpsig.org/)** - Tutorial and examples
-- **[Digital Signatures 101](https://www.cloudflare.com/learning/ssl/what-is-a-digital-signature/)** - Cryptography basics
+- **[Digital Signatures Overview](https://en.wikipedia.org/wiki/Digital_signature)** - Cryptography basics
 
 ---
 
