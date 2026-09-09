@@ -13,8 +13,8 @@ importers:
   .:
     dependencies:
       http-message-sig:
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^0.3.0
+        version: 0.3.0
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: ^0.5.0
@@ -768,8 +768,8 @@ packages:
     resolution: {integrity: sha512-0hJU9SCPvmMzIBdZFqNPXWa6dqh7WdH0cII9y+CyS8rG3nL48Bclra9HmKhVVUHyPWNH5Y7xDwAB7bfgSjkUMQ==}
     engines: {node: '>= 0.4'}
 
-  http-message-sig@0.1.0:
-    resolution: {integrity: sha512-F3ZRFxqgmo7RhftIr0mMi3yPJfqs7U0VHRlfq45pSbxHEXnh35c2BQoMSPp9Wxy4b5L8OvCNgUlb/pzdNeLM3Q==}
+  http-message-sig@0.3.0:
+    resolution: {integrity: sha512-ossX5ZDDCRD+YtMzryp3gCg+5wqLFes1RVChEFmEE9Bzbd49Ts2IIIvFnTst/mYWx0ivrxrTTPsIIKKJ07s7+w==}
 
   is-core-module@2.16.1:
     resolution: {integrity: sha512-UfoeMA6fIJ8wTYFEUjelnaGI67v6+N7qXJEvQuIGa99l4xsCruSYOVSQ0uPANn4dAzm8lkYPaKLrrijLq7x23w==}
@@ -1007,6 +1007,10 @@ packages:
   stoppable@1.1.0:
     resolution: {integrity: sha512-KXDYZ9dszj6bzvnEMRYvxgeTHU74QBFL54XKtP3nyMuJ81CFYtABZ3bAzL2EdFUaEwJOBOgENyFj3R7oTzDyyw==}
     engines: {node: '>=4', npm: '>=6'}
+
+  structured-headers@2.0.3:
+    resolution: {integrity: sha512-4g5yxhlDMClRwCcfKfLeS7Z8yAVdOWGDADwm80Poh1iReU2KVKLGBlqwpHWJ2qovq0+ZIf1atAEO1eua2o9Rgg==}
+    engines: {node: '>=18', npm: '>=6'}
 
   supports-color@10.2.2:
     resolution: {integrity: sha512-SS+jx45GF1QjgEXQx4NJZV9ImqmO2NPz5FNsIHrsDjh2YsHnawpan7SNQ1o8NuhrbHZy9AZhIoCUiCeaW/C80g==}
@@ -1743,7 +1747,9 @@ snapshots:
     dependencies:
       function-bind: 1.1.2
 
-  http-message-sig@0.1.0: {}
+  http-message-sig@0.3.0:
+    dependencies:
+      structured-headers: 2.0.3
 
   is-core-module@2.16.1:
     dependencies:
@@ -1999,6 +2005,8 @@ snapshots:
   std-env@4.1.0: {}
 
   stoppable@1.1.0: {}
+
+  structured-headers@2.0.3: {}
 
   supports-color@10.2.2: {}
 
