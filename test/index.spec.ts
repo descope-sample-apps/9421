@@ -29,17 +29,18 @@ function createTestEnv() {
 }
 
 describe('RFC 9421 HTTP Message Signatures - Required Headers Validation', () => {
-	it('should return helpful error when x-public-key-pem header is missing', async () => {
-		// NEGATIVE TEST: Validates that missing public key header returns comprehensive help
-		// This is the most common mistake - forgetting to include the public key
-		// The error should include examples and key generation commands
-		const request = new Request('http://localhost:8787/verify', {
-			method: 'POST',
-			headers: {
-				'content-type': 'application/json',
-			},
-			body: 'test message',
+	it('serves the browser workbench without entering verification', async () => {
+		const request = new Request('http://localhost:8787/', {
+			headers: { accept: 'text/html' },
 		});
+
+		const { env, ctx } = createTestEnv();
+		const response = await worker.fetch(request, env, ctx);
+		const body = await response.text();
+
+		expect(response.status).toBe(200);
+		expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
+		expect(body).toContain('RFC 9421 Signature Workbench');
 	});
 
 	it('should provide helpful error message structure', async () => {

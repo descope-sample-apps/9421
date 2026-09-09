@@ -728,6 +728,8 @@ Always with:
 
 The service will be available at `http://localhost:8787`
 
+Open that URL in a browser to use the interactive verification workbench. Programmatic clients can send signed requests directly to the same URL.
+
 1. **Test locally:**
 
     ```shell
@@ -797,6 +799,7 @@ pnpm test
 │   ├── index.ts          # Main request handler
 │   ├── verification.ts   # Signature verification logic
 │   ├── config.ts         # Configuration and constants
+│   ├── home.ts           # Interactive verification workbench
 │   └── utils.ts          # Utility functions
 ├── test/
 │   └── index.spec.ts     # Test suite
@@ -825,7 +828,7 @@ Note: This project includes Cloudflare Workers configuration (`wrangler.jsonc`) 
 
 ### Libraries
 
-- **[http-message-sig](https://github.com/christianjeller/http-message-sig)** - Library used by this service
+- **[http-message-sig](https://github.com/cloudflare/web-bot-auth/tree/main/packages/http-message-sig)** - RFC 9421 parsing and verification library
 - **[node:crypto](https://nodejs.org/api/crypto.html)** - Node.js cryptography APIs
 
 ### Related Tools & Platforms

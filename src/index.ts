@@ -29,6 +29,7 @@
  */
 
 import { keyGenerationCommands } from './config';
+import { homePage } from './home';
 import { verifySignature } from './verification';
 
 export default {
@@ -50,6 +51,17 @@ export default {
 	 * @returns JSON response with verification results or HTML for web UI
 	 */
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+		if (request.method === 'GET' && request.headers.get('accept')?.includes('text/html')) {
+			return new Response(homePage, {
+				headers: {
+					'content-type': 'text/html; charset=utf-8',
+					'content-security-policy':
+						"default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+					'x-content-type-options': 'nosniff',
+				},
+			});
+		}
+
 		/**
 		 * Extract public key from request header.
 		 *

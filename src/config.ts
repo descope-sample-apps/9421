@@ -7,8 +7,6 @@
  * @see https://www.rfc-editor.org/rfc/rfc9421.html#name-signature-algorithms
  */
 
-import type { Algorithm } from 'http-message-sig';
-
 /**
  * Maps RFC 9421 algorithm names to Node.js crypto hash algorithm names.
  *
@@ -31,14 +29,16 @@ import type { Algorithm } from 'http-message-sig';
  * - rsa-v1_5-sha256: RSA PKCS#1 v1.5 with SHA-256 hash
  * - hmac-sha256: HMAC with SHA-256 hash
  */
-export const algorithmMap: Record<Algorithm, string | null> = {
+export const algorithmMap = {
 	ed25519: null, // Ed25519 uses SHA-512 internally, no explicit hash needed
 	'hmac-sha256': 'sha256',
 	'rsa-pss-sha512': 'sha512',
 	'rsa-v1_5-sha256': 'sha256',
 	'ecdsa-p384-sha384': 'sha384',
 	'ecdsa-p256-sha256': 'sha256',
-};
+} as const;
+
+export type SupportedAlgorithm = keyof typeof algorithmMap;
 
 /**
  * Key generation commands for supported algorithms.
