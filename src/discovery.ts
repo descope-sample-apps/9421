@@ -1,6 +1,6 @@
 export function createApiDescription(baseUrl: string) {
 	return {
-		name: 'RFC 9421 Registered Message Verifier',
+		name: '9421 Guru — RFC 9421 Registered Message Verifier',
 		description: 'Demo API for verifying RFC 9421 HTTP Message Signatures. Not an authentication service.',
 		version: '1.0',
 		endpoint: baseUrl,
@@ -26,7 +26,7 @@ export function createApiDescription(baseUrl: string) {
 
 export function createLlmsTxt(baseUrl: string): string {
 	const llmsUrl = new URL('llms.txt', baseUrl).toString();
-	return `# RFC 9421 Registered Message Verifier
+	return `# 9421 Guru — RFC 9421 Registered Message Verifier
 
 > A testing and learning tool for HTTP Message Signatures. It verifies cryptographic validity using a caller-supplied public key; it does not establish identity and must not be used as production authentication.
 

@@ -44,7 +44,7 @@ describe('RFC 9421 HTTP Message Signatures - Required Headers Validation', () =>
 		expect(response.status).toBe(200);
 		expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
 		expect(response.headers.get('vary')).toBe('Accept');
-		expect(body).toContain('Registered Signature Office');
+		expect(body).toContain('9421 Guru');
 		expect(body).toContain("replace(/\\r?\\n/g,' ')");
 		expect(body).toContain('body:body||undefined');
 		expect(body).toContain('Additional signed headers');
@@ -65,7 +65,7 @@ describe('RFC 9421 HTTP Message Signatures - Required Headers Validation', () =>
 		const llmsResponse = await worker.fetch(new Request('https://verifier.example/llms.txt'), env, ctx);
 		const llms = await llmsResponse.text();
 		expect(llmsResponse.headers.get('content-type')).toBe('text/plain; charset=utf-8');
-		expect(llms).toContain('# RFC 9421 Registered Message Verifier');
+		expect(llms).toContain('# 9421 Guru — RFC 9421 Registered Message Verifier');
 		expect(llms).toContain('Required covered components: @method, @path');
 		const mountedResponse = await worker.fetch(new Request('https://verifier.example/9421/llms.txt'), env, ctx);
 		expect(await mountedResponse.text()).toContain('Endpoint: https://verifier.example/9421/');
