@@ -131,13 +131,6 @@ openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out private-key.pe
 openssl rsa -in private-key.pem -pubout -out public-key.pem
 ```
 
-**HMAC SHA-256:**
-
-```shell
-# Generate a random secret (32 bytes for SHA-256)
-openssl rand -base64 32 > hmac-secret.txt
-```
-
 ### 2. Create a Signed Request
 
 Use a library like [`http-message-sig`](https://github.com/cloudflare/web-bot-auth/tree/main/packages/http-message-sig) to sign your request.
@@ -225,7 +218,6 @@ curl -X POST https://your-service.example.com/ \
 | **Ed25519**     | `ed25519`           | N/A (built-in) | Edwards Curve  | 256-bit   |
 | **RSA PSS**     | `rsa-pss-sha512`    | SHA-512        | RSA            | 2048+ bit |
 | **RSA v1.5**    | `rsa-v1_5-sha256`   | SHA-256        | RSA            | 2048+ bit |
-| **HMAC**        | `hmac-sha256`       | SHA-256        | Symmetric      | 256+ bit  |
 
 ### Algorithm Notes
 
@@ -233,7 +225,8 @@ curl -X POST https://your-service.example.com/ \
 - **Ed25519**: Fastest signature verification. No hash algorithm needed (uses built-in SHA-512).
 - **RSA PSS**: More secure than RSA v1.5. Use SHA-512 for better security.
 - **RSA v1.5**: Legacy algorithm. Use PSS instead for new implementations.
-- **HMAC**: Symmetric key algorithm. Both client and server share the same secret.
+
+Algorithm names are bound to their required key type and curve. RSA-PSS uses SHA-512 with a 64-byte salt; RSA v1.5 uses PKCS#1 v1.5 padding.
 
 ### Key Generation Quick Reference
 
@@ -440,7 +433,7 @@ curl -H "x-public-key-pem: $(cat public-key.pem | tr -d '\n')" ...
 Signature-Input: sig1=(...);alg="ecdsa-p256-sha256"
 ```
 
-Supported algorithms: `ecdsa-p256-sha256`, `ecdsa-p384-sha384`, `ed25519`, `rsa-pss-sha512`, `rsa-v1_5-sha256`, `hmac-sha256`
+Supported algorithms: `ecdsa-p256-sha256`, `ecdsa-p384-sha384`, `ed25519`, `rsa-pss-sha512`, `rsa-v1_5-sha256`
 
 ### Error: "Invalid signature"
 
@@ -728,6 +721,8 @@ Always with:
 
 The service will be available at `http://localhost:8787`
 
+Open that URL in a browser to use the interactive verification workbench. Programmatic clients can send signed requests directly to the same URL.
+
 1. **Test locally:**
 
     ```shell
@@ -797,6 +792,7 @@ pnpm test
 │   ├── index.ts          # Main request handler
 │   ├── verification.ts   # Signature verification logic
 │   ├── config.ts         # Configuration and constants
+│   ├── home.ts           # Interactive verification workbench
 │   └── utils.ts          # Utility functions
 ├── test/
 │   └── index.spec.ts     # Test suite
@@ -825,7 +821,7 @@ Note: This project includes Cloudflare Workers configuration (`wrangler.jsonc`) 
 
 ### Libraries
 
-- **[http-message-sig](https://github.com/christianjeller/http-message-sig)** - Library used by this service
+- **[http-message-sig](https://github.com/cloudflare/web-bot-auth/tree/main/packages/http-message-sig)** - RFC 9421 parsing and verification library
 - **[node:crypto](https://nodejs.org/api/crypto.html)** - Node.js cryptography APIs
 
 ### Related Tools & Platforms

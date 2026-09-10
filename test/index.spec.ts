@@ -13,8 +13,11 @@
  * PEM normalization logic, and response formats that can be tested in isolation.
  */
 
+import { constants, createHash, generateKeyPairSync, sign } from 'node:crypto';
+import { appendSignature, createSignatureSync } from 'http-message-sig';
 import { describe, it, expect } from 'vitest';
 import worker from '../src/index';
+import { verifySignature } from '../src/verification';
 
 /**
  * Helper function to create test environment
@@ -29,17 +32,94 @@ function createTestEnv() {
 }
 
 describe('RFC 9421 HTTP Message Signatures - Required Headers Validation', () => {
-	it('should return helpful error when x-public-key-pem header is missing', async () => {
-		// NEGATIVE TEST: Validates that missing public key header returns comprehensive help
-		// This is the most common mistake - forgetting to include the public key
-		// The error should include examples and key generation commands
-		const request = new Request('http://localhost:8787/verify', {
-			method: 'POST',
-			headers: {
-				'content-type': 'application/json',
-			},
-			body: 'test message',
+	it('serves a robust browser workbench without entering verification', async () => {
+		const request = new Request('http://localhost:8787/', {
+			headers: { accept: 'TEXT/HTML' },
 		});
+
+		const { env, ctx } = createTestEnv();
+		const response = await worker.fetch(request, env, ctx);
+		const body = await response.text();
+
+		expect(response.status).toBe(200);
+		expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
+		expect(response.headers.get('vary')).toBe('Accept');
+		expect(body).toContain('Registered Signature Office');
+		expect(body).toContain("replace(/\\r?\\n/g,' ')");
+		expect(body).toContain('body:body||undefined');
+		expect(body).toContain('Additional signed headers');
+		expect(body).toContain("const headers={...(body?{'content-type':'application/json'}:{}),...additionalHeaders");
+		expect(body).not.toContain('<code>hmac-sha256</code>');
+		expect(body).toContain("status.textContent='Error loading manifest'");
+	});
+
+	it('publishes agent-readable API discovery resources', async () => {
+		const { env, ctx } = createTestEnv();
+		const manifestResponse = await worker.fetch(
+			new Request('https://verifier.example/', { headers: { accept: 'application/json' } }), env, ctx
+		);
+		const manifest = (await manifestResponse.json()) as any;
+		expect(manifest.endpoint).toBe('https://verifier.example/');
+		expect(manifest.requiredCoveredComponents).toEqual(['@method', '@path']);
+		expect(manifest.llmsTxt).toBe('https://verifier.example/llms.txt');
+		const llmsResponse = await worker.fetch(new Request('https://verifier.example/llms.txt'), env, ctx);
+		const llms = await llmsResponse.text();
+		expect(llmsResponse.headers.get('content-type')).toBe('text/plain; charset=utf-8');
+		expect(llms).toContain('# RFC 9421 Registered Message Verifier');
+		expect(llms).toContain('Required covered components: @method, @path');
+		const mountedResponse = await worker.fetch(new Request('https://verifier.example/9421/llms.txt'), env, ctx);
+		expect(await mountedResponse.text()).toContain('Endpoint: https://verifier.example/9421/');
+
+		const mountedManifestResponse = await worker.fetch(
+			new Request('https://verifier.example/9421', { headers: { accept: 'application/json' } }),
+			env,
+			ctx
+		);
+		const mountedManifest = (await mountedManifestResponse.json()) as any;
+		expect(mountedManifest.endpoint).toBe('https://verifier.example/9421/');
+		expect(mountedManifest.llmsTxt).toBe('https://verifier.example/9421/llms.txt');
+	});
+
+	it('routes signed GET requests to signature verification', async () => {
+		const { env, ctx } = createTestEnv();
+		const request = new Request('https://verifier.example/resource', {
+			headers: {
+				accept: 'text/html',
+				signature: 'sig1=:dGVzdA==:',
+				'signature-input': 'sig1=("@method" "@path");alg="ed25519"',
+				'x-public-key-pem': 'not a public key',
+			},
+		});
+
+		const response = await worker.fetch(request, env, ctx);
+		const body = (await response.json()) as any;
+
+		expect(response.status).toBe(400);
+		expect(body).toHaveProperty('verified', false);
+		expect(body).toHaveProperty('error');
+		expect(body).not.toHaveProperty('endpoint');
+	});
+
+	it('rejects signatures that cover no request components', async () => {
+		const { privateKey, publicKey } = generateKeyPairSync('ed25519');
+		const request = new Request('https://example.com/verify', { method: 'POST' });
+		const fields = createSignatureSync(request, {
+			components: [],
+			parameters: { alg: 'ed25519' },
+			signer: {
+				algorithm: 'ed25519',
+				sign: (data) => sign(null, data, privateKey),
+			},
+		});
+		const signedRequest = new Request(request, { headers: appendSignature(request.headers, fields) });
+
+		const result = await verifySignature(
+			signedRequest,
+			publicKey.export({ type: 'spki', format: 'pem' }).toString()
+		);
+
+		expect(result.verified).toBe(false);
+		expect(result.error).toContain('@method');
 	});
 
 	it('should provide helpful error message structure', async () => {
@@ -82,7 +162,7 @@ describe('RFC 9421 HTTP Message Signatures - PEM Format Handling', () => {
 
 		expect(response.status).toBe(400);
 		expect(data).toHaveProperty('verified', false);
-		expect(data.error).toContain('Failed to parse public key');
+		expect(data.error).toMatch(/Failed to parse public key|Only SPKI PUBLIC KEY PEM/);
 	});
 
 	it('should reject PEM missing BEGIN header', async () => {
@@ -107,7 +187,7 @@ describe('RFC 9421 HTTP Message Signatures - PEM Format Handling', () => {
 
 		expect(response.status).toBe(400);
 		expect(data).toHaveProperty('verified', false);
-		expect(data.error).toContain('Failed to parse public key');
+		expect(data.error).toMatch(/Failed to parse public key|Only SPKI PUBLIC KEY PEM/);
 	});
 
 	it('should reject PEM missing END footer', async () => {
@@ -132,7 +212,7 @@ describe('RFC 9421 HTTP Message Signatures - PEM Format Handling', () => {
 
 		expect(response.status).toBe(400);
 		expect(data).toHaveProperty('verified', false);
-		expect(data.error).toContain('Failed to parse public key');
+		expect(data.error).toMatch(/Failed to parse public key|Only SPKI PUBLIC KEY PEM/);
 	});
 });
 
@@ -163,7 +243,7 @@ describe('RFC 9421 HTTP Message Signatures - Response Format', () => {
 		expect(data).toHaveProperty('error');
 		expect(data).toHaveProperty('Signature');
 		expect(data).toHaveProperty('Signature-Input');
-		expect(data).toHaveProperty('pemKey');
+		expect(data).not.toHaveProperty('pemKey');
 		expect(typeof data.error).toBe('string');
 	});
 
@@ -192,7 +272,7 @@ describe('RFC 9421 HTTP Message Signatures - Response Format', () => {
 
 		expect(data.Signature).toBe(testSig);
 		expect(data['Signature-Input']).toBe(testSigInput);
-		expect(data.pemKey).toBe(testPem);
+		expect(data).not.toHaveProperty('pemKey');
 	});
 });
 
@@ -337,7 +417,7 @@ describe('RFC 9421 HTTP Message Signatures - Error Message Quality', () => {
 		const response = await worker.fetch(request, env, ctx);
 		const data = (await response.json()) as any;
 
-		expect(data.error).toContain('Failed to parse public key');
+		expect(data.error).toMatch(/Failed to parse public key|Only SPKI PUBLIC KEY PEM/);
 		expect(data.verified).toBe(false);
 	});
 
@@ -367,7 +447,7 @@ describe('RFC 9421 HTTP Message Signatures - Error Message Quality', () => {
 		expect(data).toHaveProperty('error');
 		expect(data).toHaveProperty('Signature', testSig);
 		expect(data).toHaveProperty('Signature-Input', testSigInput);
-		expect(data).toHaveProperty('pemKey', testPem);
+		expect(data).not.toHaveProperty('pemKey');
 	});
 });
 
@@ -398,5 +478,71 @@ describe('RFC 9421 HTTP Message Signatures - Algorithm Support', () => {
 		// The error could be about PEM parsing or unsupported algorithm depending on execution order
 		expect(data.error).toBeTruthy();
 		expect(typeof data.error).toBe('string');
+	});
+});
+
+describe('RFC 9421 HTTP Message Signatures - Security invariants', () => {
+	const publicPem = (key: any) => key.export({ type: 'spki', format: 'pem' }).toString();
+
+	it('rejects a declared algorithm that does not match the key family', async () => {
+		const { privateKey, publicKey } = generateKeyPairSync('ed25519');
+		const request = new Request('https://example.com/verify', { method: 'POST' });
+		const fields = createSignatureSync(request, {
+			components: ['@method', '@path'], parameters: { alg: 'rsa-v1_5-sha256' },
+			signer: { algorithm: 'rsa-v1_5-sha256', sign: (data) => sign(null, data, privateKey) },
+		});
+		const result = await verifySignature(new Request(request, { headers: appendSignature(request.headers, fields) }), publicPem(publicKey));
+		expect(result.verified).toBe(false);
+		expect(result.error).toContain('requires an RSA public key');
+	});
+
+	it('verifies RSA-PSS with a SHA-512 digest-length salt', async () => {
+		const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+		const request = new Request('https://example.com/verify', { method: 'POST' });
+		const fields = createSignatureSync(request, {
+			components: ['@method', '@path'], parameters: { alg: 'rsa-pss-sha512' },
+			signer: { algorithm: 'rsa-pss-sha512', sign: (data) => sign('sha512', data, { key: privateKey.export({ type: 'pkcs8', format: 'pem' }).toString(), padding: constants.RSA_PKCS1_PSS_PADDING, saltLength: 64 }) },
+		});
+		expect(await verifySignature(new Request(request, { headers: appendSignature(request.headers, fields) }), publicPem(publicKey))).toEqual({ verified: true });
+	});
+
+	it('authenticates the exact request body with Content-Digest', async () => {
+		const { privateKey, publicKey } = generateKeyPairSync('ed25519');
+		const body = '{"safe":true}';
+		const digest = createHash('sha256').update(body).digest('base64');
+		const request = new Request('https://example.com/verify', { method: 'POST', headers: { 'content-digest': `sha-256=:${digest}:` }, body });
+		const fields = createSignatureSync(request, {
+			components: ['@method', '@path', 'content-digest'], parameters: { alg: 'ed25519' },
+			signer: { algorithm: 'ed25519', sign: (data) => sign(null, data, privateKey) },
+		});
+		const headers = appendSignature(request.headers, fields);
+		expect(await verifySignature(new Request(request, { headers }), publicPem(publicKey))).toEqual({ verified: true });
+		const result = await verifySignature(new Request(request.url, { method: 'POST', headers, body: '{"safe":false}' }), publicPem(publicKey));
+		expect(result.verified).toBe(false);
+		expect(result.error).toContain('does not match');
+	});
+
+	it('rejects bodies whose Content-Digest is not covered', async () => {
+		const { privateKey, publicKey } = generateKeyPairSync('ed25519');
+		const request = new Request('https://example.com/verify', { method: 'POST', body: 'payload' });
+		const fields = createSignatureSync(request, {
+			components: ['@method', '@path'], parameters: { alg: 'ed25519' },
+			signer: { algorithm: 'ed25519', sign: (data) => sign(null, data, privateKey) },
+		});
+		const result = await verifySignature(new Request(request, { headers: appendSignature(request.headers, fields) }), publicPem(publicKey));
+		expect(result.verified).toBe(false);
+		expect(result.error).toContain('must cover the content-digest');
+	});
+
+	it('rejects private-key PEM input without echoing it', async () => {
+		const { privateKey } = generateKeyPairSync('ed25519');
+		const privatePem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+		const headerPrivatePem = privatePem.replace(/\r?\n/g, ' ');
+		const request = new Request('https://example.com/verify', { method: 'POST', headers: { 'x-public-key-pem': headerPrivatePem, signature: 'sig1=:AAAA:', 'signature-input': 'sig1=("@method" "@path");alg="ed25519"' } });
+		const { env, ctx } = createTestEnv();
+		const data = (await (await worker.fetch(request, env, ctx)).json()) as any;
+		expect(data.verified).toBe(false);
+		expect(data.error).toContain('Only SPKI PUBLIC KEY PEM');
+		expect(JSON.stringify(data)).not.toContain(headerPrivatePem);
 	});
 });

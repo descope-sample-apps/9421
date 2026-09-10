@@ -29,6 +29,8 @@
  */
 
 import { keyGenerationCommands } from './config';
+import { createApiDescription, createLlmsTxt } from './discovery';
+import { homePage } from './home';
 import { verifySignature } from './verification';
 
 export default {
@@ -50,6 +52,49 @@ export default {
 	 * @returns JSON response with verification results or HTML for web UI
 	 */
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+		const url = new URL(request.url);
+		const basePath = url.pathname.endsWith('/llms.txt')
+			? url.pathname.slice(0, -'llms.txt'.length)
+			: url.pathname.endsWith('/')
+				? url.pathname
+				: `${url.pathname}/`;
+		const baseUrl = new URL(basePath, url.origin).toString();
+		const hasSignatureMaterial =
+			request.headers.has('signature') ||
+			request.headers.has('signature-input') ||
+			request.headers.has('x-public-key-pem');
+
+		if (request.method === 'GET' && url.pathname.endsWith('/llms.txt')) {
+			return new Response(createLlmsTxt(baseUrl), {
+				headers: {
+					'content-type': 'text/plain; charset=utf-8',
+					'cache-control': 'public, max-age=3600',
+				},
+			});
+		}
+
+		if (
+			request.method === 'GET' &&
+			!hasSignatureMaterial &&
+			request.headers.get('accept')?.toLowerCase().includes('text/html')
+		) {
+			return new Response(homePage, {
+				headers: {
+					'content-type': 'text/html; charset=utf-8',
+					'content-security-policy':
+						"default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+					'x-content-type-options': 'nosniff',
+					vary: 'Accept',
+				},
+			});
+		}
+
+		if (request.method === 'GET' && !hasSignatureMaterial) {
+			return Response.json(createApiDescription(baseUrl), {
+				headers: { vary: 'Accept' },
+			});
+		}
+
 		/**
 		 * Extract public key from request header.
 		 *
@@ -102,7 +147,6 @@ export default {
 			 * - verified: true (signature passed verification)
 			 * - Signature: Echo of the Signature header (for debugging)
 			 * - Signature-Input: Echo of the Signature-Input header (for debugging)
-			 * - pemKey: Echo of the public key (for debugging)
 			 *
 			 * ⚠️ PRODUCTION WARNING:
 			 * Echoing keys and signatures helps attackers analyze your system.
@@ -113,7 +157,6 @@ export default {
 					verified: true,
 					Signature: request.headers.get('Signature'),
 					'Signature-Input': request.headers.get('Signature-Input'),
-					pemKey,
 				},
 				{ status: 200 }
 			);
@@ -128,8 +171,8 @@ export default {
 			 * - "Missing Signature header": No Signature header in request
 			 * - "Missing Signature-Input header": No Signature-Input header in request
 			 *
-			 * The response includes the signature headers and public key to help
-			 * developers debug their signature generation code.
+			 * The response includes the signature headers to help developers debug
+			 * their signature generation code. Public-key input is never echoed.
 			 *
 			 * ⚠️ PRODUCTION WARNING:
 			 * Detailed error messages help attackers probe your system.
@@ -141,7 +184,6 @@ export default {
 					error: result.error,
 					Signature: request.headers.get('Signature'),
 					'Signature-Input': request.headers.get('Signature-Input'),
-					pemKey,
 				},
 				{ status: 400 }
 			);

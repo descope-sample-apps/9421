@@ -7,9 +7,16 @@
  * @see https://www.rfc-editor.org/rfc/rfc9421.html
  */
 
-import { verify, type Algorithm, type Parameters } from 'http-message-sig';
-import { createPublicKey, verify as cryptoVerify } from 'node:crypto';
-import { algorithmMap } from './config';
+import { verifySignature as verifyHttpSignature, type UntrustedSignatureCandidate, type Verifier } from 'http-message-sig';
+import {
+	constants,
+	createHash,
+	createPublicKey,
+	timingSafeEqual,
+	verify as cryptoVerify,
+	type KeyObject,
+} from 'node:crypto';
+import { algorithmMap, type SupportedAlgorithm } from './config';
 import { normalizePem } from './utils';
 
 /**
@@ -18,6 +25,75 @@ import { normalizePem } from './utils';
 export interface VerificationResult {
 	verified: boolean;
 	error?: string;
+}
+
+function assertPublicKeyMatchesAlgorithm(publicKey: KeyObject, algorithm: SupportedAlgorithm): void {
+	const details = publicKey.asymmetricKeyDetails;
+
+	switch (algorithm) {
+		case 'ed25519':
+			if (publicKey.asymmetricKeyType !== 'ed25519') throw new Error('Algorithm ed25519 requires an Ed25519 public key');
+			break;
+		case 'ecdsa-p256-sha256':
+			if (publicKey.asymmetricKeyType !== 'ec' || details?.namedCurve !== 'prime256v1') {
+				throw new Error('Algorithm ecdsa-p256-sha256 requires a P-256 public key');
+			}
+			break;
+		case 'ecdsa-p384-sha384':
+			if (publicKey.asymmetricKeyType !== 'ec' || details?.namedCurve !== 'secp384r1') {
+				throw new Error('Algorithm ecdsa-p384-sha384 requires a P-384 public key');
+			}
+			break;
+		case 'rsa-pss-sha512':
+		case 'rsa-v1_5-sha256':
+			if (publicKey.asymmetricKeyType !== 'rsa' && publicKey.asymmetricKeyType !== 'rsa-pss') {
+				throw new Error(`Algorithm ${algorithm} requires an RSA public key`);
+			}
+			if ((details?.modulusLength ?? 0) < 2048) throw new Error('RSA public keys must be at least 2048 bits');
+			break;
+	}
+}
+
+function verifyWithAlgorithm(
+	algorithm: SupportedAlgorithm,
+	publicKey: KeyObject,
+	data: Uint8Array,
+	signature: Uint8Array
+): boolean {
+	assertPublicKeyMatchesAlgorithm(publicKey, algorithm);
+
+	if (algorithm === 'rsa-pss-sha512') {
+		return cryptoVerify('sha512', data, {
+			key: publicKey.export({ type: 'spki', format: 'pem' }),
+			padding: constants.RSA_PKCS1_PSS_PADDING,
+			saltLength: 64,
+		}, signature);
+	}
+	if (algorithm === 'rsa-v1_5-sha256') {
+		return cryptoVerify('sha256', data, {
+			key: publicKey.export({ type: 'spki', format: 'pem' }),
+			padding: constants.RSA_PKCS1_PADDING,
+		}, signature);
+	}
+	return cryptoVerify(algorithmMap[algorithm], data, publicKey, signature);
+}
+
+async function validateContentDigest(request: Request, coveredComponents: readonly { name: string }[]): Promise<void> {
+	if (request.body === null) return;
+	if (!coveredComponents.some((component) => component.name.toLowerCase() === 'content-digest')) {
+		throw new Error('Requests with a body must cover the content-digest header');
+	}
+
+	const header = request.headers.get('content-digest');
+	const match = header?.match(/(?:^|,\s*)(sha-256|sha-512)=:([A-Za-z0-9+/]+={0,2}):(?:\s*(?:,|$))/i);
+	if (!match) throw new Error('Missing or unsupported Content-Digest header');
+
+	const digestName = match[1].toLowerCase() === 'sha-256' ? 'sha256' : 'sha512';
+	const expected = Buffer.from(match[2], 'base64');
+	const actual = createHash(digestName).update(Buffer.from(await request.clone().arrayBuffer())).digest();
+	if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
+		throw new Error('Content-Digest does not match the request body');
+	}
 }
 
 /**
@@ -47,112 +123,40 @@ export interface VerificationResult {
  */
 export async function verifySignature(request: Request, pemKey: string): Promise<VerificationResult> {
 	try {
-		/**
-		 * Verify the HTTP message signature per RFC 9421.
-		 * 
-		 * The verify() function from http-message-sig:
-		 * 1. Extracts Signature and Signature-Input headers
-		 * 2. Reconstructs the signature base (what was signed)
-		 * 3. Calls our callback to verify the signature cryptographically
-		 * 4. Throws an error if verification fails
-		 * 
-		 * Our callback receives:
-		 * - data: The signature base string (what should be signed)
-		 * - signature: The actual signature bytes from the Signature header
-		 * - params: Parsed parameters from Signature-Input (alg, keyid, created, etc.)
-		 * 
-		 * @see https://www.rfc-editor.org/rfc/rfc9421.html#name-signature-verification
-		 */
-		await verify(request, async (data: string, signature: Uint8Array, params: Parameters) => {
-			// Parse the PEM-encoded public key
-			let publicKey;
-			try {
-				/**
-				 * Parse the PEM-encoded public key into a KeyObject.
-				 * 
-				 * createPublicKey() supports multiple formats:
-				 * - PEM (what we use): -----BEGIN PUBLIC KEY----- base64 -----END PUBLIC KEY-----
-				 * - DER: Raw binary format
-				 * - JWK: JSON Web Key format
-				 * 
-				 * The parsed KeyObject can be used with crypto.verify() for
-				 * signature verification with various algorithms.
-				 * 
-				 * @throws Error if PEM format is invalid or key type is unsupported
-				 */
-				const normalizedPem = normalizePem(pemKey);
-				publicKey = createPublicKey(normalizedPem);
-			} catch (err) {
-				throw new Error(`Failed to parse public key: ${err instanceof Error ? err.message : String(err)}`);
-			}
+		if (!/^-----BEGIN PUBLIC KEY-----/.test(pemKey.trim()) || !/-----END PUBLIC KEY-----$/.test(pemKey.trim())) {
+			throw new Error('Only SPKI PUBLIC KEY PEM input is accepted');
+		}
 
-			/**
-			 * Extract and validate the signature algorithm.
-			 * 
-			 * RFC 9421 requires the 'alg' parameter in Signature-Input header.
-			 * Example: sig1=(...);alg="ecdsa-p256-sha256"
-			 * 
-			 * We validate that:
-			 * 1. The 'alg' parameter is present
-			 * 2. The algorithm is in our supported list (algorithmMap)
-			 * 
-			 * Without a valid algorithm, we cannot verify the signature.
-			 * 
-			 * @see https://www.rfc-editor.org/rfc/rfc9421.html#name-signature-algorithm
-			 */
-			if (!params.alg || !(params.alg in algorithmMap)) {
-				throw new Error(`Unsupported or missing algorithm: ${params.alg}`);
-			}
+		let publicKey;
+		try {
+			publicKey = createPublicKey(normalizePem(pemKey));
+		} catch (error) {
+			throw new Error(`Failed to parse public key: ${error instanceof Error ? error.message : String(error)}`);
+		}
 
-			/**
-			 * Map RFC 9421 algorithm name to Node.js hash algorithm.
-			 * 
-			 * For most algorithms, we need to specify the hash separately:
-			 * - ecdsa-p256-sha256 → sha256
-			 * - rsa-pss-sha512 → sha512
-			 * 
-			 * Exception: Ed25519 uses null (built-in SHA-512)
-			 */
-			const hashAlgorithm = algorithmMap[params.alg as Algorithm];
+		const verifiedSignature = await verifyHttpSignature(request, {
+			label: request.headers.get('x-signature-label') ?? undefined,
+			policy: {
+				algorithms: Object.keys(algorithmMap),
+				requiredComponents: ['@method', '@path'],
+				requiredParameters: ['alg'],
+			},
+			resolveVerifier(candidate: UntrustedSignatureCandidate): Verifier {
+				if (!candidate.algorithm || !(candidate.algorithm in algorithmMap)) {
+					throw new Error(`Unsupported or missing algorithm: ${candidate.algorithm}`);
+				}
 
-			/**
-			 * Verify the cryptographic signature.
-			 * 
-			 * crypto.verify() checks that:
-			 * 1. The signature was created by the private key matching this public key
-			 * 2. The signature covers the exact data provided
-			 * 3. The signature hasn't been tampered with
-			 * 
-			 * Parameters:
-			 * - hashAlgorithm: Hash function used (sha256, sha384, sha512, or null for ed25519)
-			 * - data: The signature base string from RFC 9421 (what was signed)
-			 * - publicKey: The parsed public key
-			 * - signature: The signature bytes from the Signature header
-			 * 
-			 * Returns:
-			 * - true: Signature is valid (request authentically signed with matching private key)
-			 * - false: Signature is invalid (wrong key, tampered data, or corrupted signature)
-			 * 
-			 * @see https://nodejs.org/api/crypto.html#cryptoverifyalgorithm-data-key-signature-callback
-			 */
-			const isValid = cryptoVerify(hashAlgorithm, Buffer.from(data), publicKey, signature);
-
-			if (!isValid) {
-				throw new Error('Invalid signature');
-			}
+				const algorithm = candidate.algorithm as SupportedAlgorithm;
+				return {
+					algorithm,
+					verify: (data, signature) => verifyWithAlgorithm(algorithm, publicKey, data, signature),
+				};
+			},
 		});
 
-		// Verification succeeded
+		await validateContentDigest(request, verifiedSignature.components);
 		return { verified: true };
 	} catch (error) {
-		/**
-		 * Common verification errors:
-		 * - "Invalid signature": Signature doesn't match (wrong key, tampered data)
-		 * - "Failed to parse public key": Invalid PEM format
-		 * - "Unsupported or missing algorithm": Invalid or missing 'alg' parameter
-		 * - "Missing Signature header": No Signature header in request
-		 * - "Missing Signature-Input header": No Signature-Input header in request
-		 */
 		return {
 			verified: false,
 			error: error instanceof Error ? error.message : String(error),
