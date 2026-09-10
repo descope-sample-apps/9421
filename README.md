@@ -706,13 +706,14 @@ Always with:
 1. **Install dependencies:**
 
     ```shell
+    mise install
     pnpm install
     ```
 
 1. **Start the Vercel development server:**
 
     ```shell
-    pnpm dlx vercel@59.13.1 dev
+    vercel dev
     ```
 
 The service will be available at `http://localhost:3000`.
@@ -726,14 +727,14 @@ This project is configured as a Vercel Node.js Function. `api/index.ts` exposes 
 1. **Authenticate and link the project:**
 
     ```shell
-    pnpm dlx vercel@59.13.1 login
-    pnpm dlx vercel@59.13.1 link
+    vercel login
+    vercel link
     ```
 
 1. **Create a preview deployment:**
 
     ```shell
-    pnpm dlx vercel@59.13.1
+    vercel
     ```
 
 1. **Verify the preview URL, then deploy to production:**

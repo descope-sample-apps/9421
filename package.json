@@ -22,7 +22,7 @@
 		"node": "24.x"
 	},
 	"scripts": {
-		"deploy": "pnpm dlx vercel@59.13.1 --prod",
+		"deploy": "vercel --prod",
 		"typecheck": "tsc --noEmit && tsc -p api/tsconfig.json --noEmit",
 		"test": "vitest"
 	},
