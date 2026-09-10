@@ -50,6 +50,7 @@ describe('RFC 9421 HTTP Message Signatures - Required Headers Validation', () =>
 		expect(body).toContain('Additional signed headers');
 		expect(body).toContain("const headers={...(body?{'content-type':'application/json'}:{}),...additionalHeaders");
 		expect(body).not.toContain('<code>hmac-sha256</code>');
+		expect(body).toContain("status.textContent='Error loading manifest'");
 	});
 
 	it('publishes agent-readable API discovery resources', async () => {
@@ -83,7 +84,7 @@ describe('RFC 9421 HTTP Message Signatures - Required Headers Validation', () =>
 		const { env, ctx } = createTestEnv();
 		const request = new Request('https://verifier.example/resource', {
 			headers: {
-				accept: 'application/json',
+				accept: 'text/html',
 				signature: 'sig1=:dGVzdA==:',
 				'signature-input': 'sig1=("@method" "@path");alg="ed25519"',
 				'x-public-key-pem': 'not a public key',

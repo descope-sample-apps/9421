@@ -84,7 +84,7 @@ export const homePage = `<!doctype html>
 	const form=document.querySelector('#verifier');
 	const result=document.querySelector('#result');
 	const status=document.querySelector('#status');
-	document.querySelector('[data-api]').addEventListener('click',event=>{event.preventDefault();fetch(location.href,{headers:{accept:'application/json'}}).then(r=>r.json()).then(data=>{result.textContent=JSON.stringify(data,null,2);result.className='result';status.textContent='API manifest';});});
+	document.querySelector('[data-api]').addEventListener('click',event=>{event.preventDefault();fetch(location.href,{headers:{accept:'application/json'}}).then(r=>r.json()).then(data=>{result.textContent=JSON.stringify(data,null,2);result.className='result';status.textContent='API manifest';}).catch(error=>{result.textContent=String(error);result.className='result bad';status.textContent='Error loading manifest';});});
 	form.addEventListener('submit',async(event)=>{
 		event.preventDefault();
 		const button=form.querySelector('button');

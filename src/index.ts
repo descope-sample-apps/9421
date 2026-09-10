@@ -59,6 +59,10 @@ export default {
 				? url.pathname
 				: `${url.pathname}/`;
 		const baseUrl = new URL(basePath, url.origin).toString();
+		const hasSignatureMaterial =
+			request.headers.has('signature') ||
+			request.headers.has('signature-input') ||
+			request.headers.has('x-public-key-pem');
 
 		if (request.method === 'GET' && url.pathname.endsWith('/llms.txt')) {
 			return new Response(createLlmsTxt(baseUrl), {
@@ -69,7 +73,11 @@ export default {
 			});
 		}
 
-		if (request.method === 'GET' && request.headers.get('accept')?.toLowerCase().includes('text/html')) {
+		if (
+			request.method === 'GET' &&
+			!hasSignatureMaterial &&
+			request.headers.get('accept')?.toLowerCase().includes('text/html')
+		) {
 			return new Response(homePage, {
 				headers: {
 					'content-type': 'text/html; charset=utf-8',
@@ -81,12 +89,7 @@ export default {
 			});
 		}
 
-		if (
-			request.method === 'GET' &&
-			!request.headers.has('signature') &&
-			!request.headers.has('signature-input') &&
-			!request.headers.has('x-public-key-pem')
-		) {
+		if (request.method === 'GET' && !hasSignatureMaterial) {
 			return Response.json(createApiDescription(baseUrl), {
 				headers: { vary: 'Accept' },
 			});
