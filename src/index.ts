@@ -82,7 +82,7 @@ export default {
 				headers: {
 					'content-type': 'text/html; charset=utf-8',
 					'content-security-policy':
-						"default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+						"default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
 					'x-content-type-options': 'nosniff',
 					vary: 'Accept',
 				},
