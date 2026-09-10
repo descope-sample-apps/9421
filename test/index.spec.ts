@@ -48,6 +48,7 @@ describe('RFC 9421 HTTP Message Signatures - Required Headers Validation', () =>
 		expect(body).toContain("replace(/\\r?\\n/g,' ')");
 		expect(body).toContain('body:body||undefined');
 		expect(body).toContain('Additional signed headers');
+		expect(body).toContain("const headers={'content-type':'application/json',...additionalHeaders");
 		expect(body).not.toContain('<code>hmac-sha256</code>');
 	});
 

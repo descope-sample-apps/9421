@@ -90,7 +90,7 @@ export const homePage = `<!doctype html>
 		button.disabled=true; status.textContent='checking'; result.className='result'; result.textContent='Reconstructing signature base…';
 		try {
 			const additionalHeaders=JSON.parse(document.querySelector('#headers').value||'{}');
-			const headers={...additionalHeaders,'signature-input':document.querySelector('#signature-input').value,'signature':document.querySelector('#signature').value,'x-public-key-pem':document.querySelector('#key').value.replace(/\\r?\\n/g,' ')};
+			const headers={'content-type':'application/json',...additionalHeaders,'signature-input':document.querySelector('#signature-input').value,'signature':document.querySelector('#signature').value,'x-public-key-pem':document.querySelector('#key').value.replace(/\\r?\\n/g,' ')};
 			const body=document.querySelector('#body').value;
 			const response=await fetch(location.href,{method:'POST',headers,body:body||undefined});
 			const data=await response.json();
