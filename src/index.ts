@@ -58,9 +58,10 @@ export async function handleRequest(request: Request): Promise<Response> {
 	const baseUrl = new URL(basePath, url.origin).toString();
 	const hasSignatureMaterial =
 		request.headers.has('signature') || request.headers.has('signature-input') || request.headers.has('x-public-key-pem');
+	const isReadMethod = request.method === 'GET' || request.method === 'HEAD';
 
-	if (request.method === 'GET' && url.pathname.endsWith('/llms.txt')) {
-		return new Response(createLlmsTxt(baseUrl), {
+	if (isReadMethod && !hasSignatureMaterial && url.pathname.endsWith('/llms.txt')) {
+		return new Response(request.method === 'HEAD' ? null : createLlmsTxt(baseUrl), {
 			headers: {
 				'content-type': 'text/plain; charset=utf-8',
 				'cache-control': 'public, max-age=3600',
@@ -68,8 +69,8 @@ export async function handleRequest(request: Request): Promise<Response> {
 		});
 	}
 
-	if (request.method === 'GET' && !hasSignatureMaterial && request.headers.get('accept')?.toLowerCase().includes('text/html')) {
-		return new Response(homePage, {
+	if (isReadMethod && !hasSignatureMaterial && request.headers.get('accept')?.toLowerCase().includes('text/html')) {
+		return new Response(request.method === 'HEAD' ? null : homePage, {
 			headers: {
 				'content-type': 'text/html; charset=utf-8',
 				'content-security-policy':
@@ -80,9 +81,9 @@ export async function handleRequest(request: Request): Promise<Response> {
 		});
 	}
 
-	if (request.method === 'GET' && !hasSignatureMaterial) {
-		return Response.json(createApiDescription(baseUrl), {
-			headers: { vary: 'Accept' },
+	if (isReadMethod && !hasSignatureMaterial) {
+		return new Response(request.method === 'HEAD' ? null : JSON.stringify(createApiDescription(baseUrl)), {
+			headers: { 'content-type': 'application/json', vary: 'Accept' },
 		});
 	}
 

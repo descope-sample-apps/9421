@@ -83,6 +83,35 @@ describe('RFC 9421 HTTP Message Signatures - Required Headers Validation', () =>
 		expect(body).not.toHaveProperty('endpoint');
 	});
 
+	it('routes signed llms.txt requests to signature verification', async () => {
+		const response = await handleRequest(
+			new Request('https://verifier.example/llms.txt', {
+				headers: {
+					signature: 'sig1=:dGVzdA==:',
+					'signature-input': 'sig1=("@method" "@path");alg="ed25519"',
+					'x-public-key-pem': 'not a public key',
+				},
+			})
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(400);
+		expect(body).toHaveProperty('verified', false);
+	});
+
+	it('serves discovery headers without a body for HEAD requests', async () => {
+		const response = await handleRequest(
+			new Request('https://verifier.example/', {
+				method: 'HEAD',
+				headers: { accept: 'application/json' },
+			})
+		);
+
+		expect(response.status).toBe(200);
+		expect(response.headers.get('content-type')).toBe('application/json');
+		expect(await response.text()).toBe('');
+	});
+
 	it('rejects signatures that cover no request components', async () => {
 		const { privateKey, publicKey } = generateKeyPairSync('ed25519');
 		const request = new Request('https://example.com/verify', { method: 'POST' });

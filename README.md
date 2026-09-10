@@ -712,10 +712,8 @@ Always with:
 1. **Start the Vercel development server:**
 
     ```shell
-    pnpm dev
+    pnpm exec vercel dev
     ```
-
-    The first run may ask you to authenticate and link a Vercel project. For a local server without Vercel project setup, use `pnpm start` instead.
 
 The service will be available at `http://localhost:3000`.
 
@@ -723,7 +721,7 @@ Open that URL in a browser to use the interactive verification workbench. Progra
 
 ### Deployment
 
-This project is configured as a Vercel Node.js application. `src/server.ts` is the server entrypoint; it preserves the original request method, path, headers, and body required for RFC 9421 verification.
+This project is configured as a Vercel Node.js Function. `api/index.ts` exposes the Web `Request`/`Response` handler, and `vercel.json` routes every public path to it so RFC 9421 verification sees the original request.
 
 1. **Authenticate and link the project:**
 
@@ -758,8 +756,9 @@ pnpm test
 
 ```shell
 .
+├── api/
+│   └── index.ts          # Vercel Function entrypoint
 ├── src/
-│   ├── server.ts         # Vercel Node.js server entrypoint
 │   ├── index.ts          # Platform-neutral request handler
 │   ├── verification.ts   # Signature verification logic
 │   ├── config.ts         # Configuration and constants
