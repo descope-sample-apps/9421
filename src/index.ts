@@ -28,10 +28,10 @@
  * @see https://github.com/cloudflare/web-bot-auth/tree/main/packages/http-message-sig - Signing library
  */
 
-import { keyGenerationCommands } from './config';
-import { createApiDescription, createLlmsTxt } from './discovery';
-import { homePage } from './home';
-import { verifySignature } from './verification';
+import { keyGenerationCommands } from './config.js';
+import { createApiDescription, createLlmsTxt } from './discovery.js';
+import { homePage } from './home.js';
+import { verifySignature } from './verification.js';
 
 /**
  * Main request handler for HTTP Message Signature verification.

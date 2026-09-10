@@ -16,8 +16,8 @@ import {
 	verify as cryptoVerify,
 	type KeyObject,
 } from 'node:crypto';
-import { algorithmMap, type SupportedAlgorithm } from './config';
-import { normalizePem } from './utils';
+import { algorithmMap, type SupportedAlgorithm } from './config.js';
+import { normalizePem } from './utils.js';
 
 /**
  * Result of signature verification.

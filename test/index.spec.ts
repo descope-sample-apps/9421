@@ -16,8 +16,8 @@
 import { constants, createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { appendSignature, createSignatureSync } from 'http-message-sig';
 import { describe, it, expect } from 'vitest';
-import { handleRequest } from '../src/index';
-import { verifySignature } from '../src/verification';
+import { handleRequest } from '../src/index.js';
+import { verifySignature } from '../src/verification.js';
 
 describe('RFC 9421 HTTP Message Signatures - Required Headers Validation', () => {
 	it('serves a robust browser workbench without entering verification', async () => {
