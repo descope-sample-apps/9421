@@ -2,7 +2,7 @@
  * Core HTTP Message Signatures (RFC 9421) verification logic.
  * 
  * This module contains the pure verification logic for HTTP message signatures,
- * separated from the Cloudflare Worker handler and web UI.
+ * separated from the HTTP request handler and web UI.
  * 
  * @see https://www.rfc-editor.org/rfc/rfc9421.html
  */
@@ -16,8 +16,8 @@ import {
 	verify as cryptoVerify,
 	type KeyObject,
 } from 'node:crypto';
-import { algorithmMap, type SupportedAlgorithm } from './config';
-import { normalizePem } from './utils';
+import { algorithmMap, type SupportedAlgorithm } from './config.js';
+import { normalizePem } from './utils.js';
 
 /**
  * Result of signature verification.

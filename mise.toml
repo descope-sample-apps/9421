@@ -1,3 +1,4 @@
 [tools]
 node = "24"
 pnpm = "10"
+"npm:vercel" = "59.13.1"

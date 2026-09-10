@@ -7,7 +7,7 @@
 		"rfc9421",
 		"demo",
 		"testing",
-		"cloudflare-workers",
+		"vercel",
 		"cryptography",
 		"message-signing",
 		"signature-verification",
@@ -17,18 +17,19 @@
 		"hmac"
 	],
 	"private": true,
+	"type": "module",
+	"engines": {
+		"node": "24.x"
+	},
 	"scripts": {
-		"deploy": "wrangler deploy",
-		"dev": "wrangler dev",
-		"start": "wrangler dev",
-		"test": "vitest",
-		"cf-typegen": "wrangler types"
+		"deploy": "vercel --prod",
+		"typecheck": "tsc --noEmit && tsc -p api/tsconfig.json --noEmit",
+		"test": "vitest"
 	},
 	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "^0.22.0",
 		"@types/node": "^24",
-		"vitest": "^4.0.0",
-		"wrangler": "^4.56.0"
+		"typescript": "^7.0.2",
+		"vitest": "^4.0.0"
 	},
 	"dependencies": {
 		"http-message-sig": "^0.3.0"
