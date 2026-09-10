@@ -131,13 +131,6 @@ openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out private-key.pe
 openssl rsa -in private-key.pem -pubout -out public-key.pem
 ```
 
-**HMAC SHA-256:**
-
-```shell
-# Generate a random secret (32 bytes for SHA-256)
-openssl rand -base64 32 > hmac-secret.txt
-```
-
 ### 2. Create a Signed Request
 
 Use a library like [`http-message-sig`](https://github.com/cloudflare/web-bot-auth/tree/main/packages/http-message-sig) to sign your request.
@@ -440,7 +433,7 @@ curl -H "x-public-key-pem: $(cat public-key.pem | tr -d '\n')" ...
 Signature-Input: sig1=(...);alg="ecdsa-p256-sha256"
 ```
 
-Supported algorithms: `ecdsa-p256-sha256`, `ecdsa-p384-sha384`, `ed25519`, `rsa-pss-sha512`, `rsa-v1_5-sha256`, `hmac-sha256`
+Supported algorithms: `ecdsa-p256-sha256`, `ecdsa-p384-sha384`, `ed25519`, `rsa-pss-sha512`, `rsa-v1_5-sha256`
 
 ### Error: "Invalid signature"
 
