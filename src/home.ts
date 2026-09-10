@@ -90,8 +90,8 @@ export const homePage = `<!doctype html>
 		button.disabled=true; status.textContent='checking'; result.className='result'; result.textContent='Reconstructing signature base…';
 		try {
 			const additionalHeaders=JSON.parse(document.querySelector('#headers').value||'{}');
-			const headers={'content-type':'application/json',...additionalHeaders,'signature-input':document.querySelector('#signature-input').value,'signature':document.querySelector('#signature').value,'x-public-key-pem':document.querySelector('#key').value.replace(/\\r?\\n/g,' ')};
 			const body=document.querySelector('#body').value;
+			const headers={...(body?{'content-type':'application/json'}:{}),...additionalHeaders,'signature-input':document.querySelector('#signature-input').value,'signature':document.querySelector('#signature').value,'x-public-key-pem':document.querySelector('#key').value.replace(/\\r?\\n/g,' ')};
 			const response=await fetch(location.href,{method:'POST',headers,body:body||undefined});
 			const data=await response.json();
 			result.textContent=JSON.stringify(data,null,2); result.classList.add(data.verified?'good':'bad'); status.textContent=data.verified?'verified':'rejected';
