@@ -712,7 +712,7 @@ Always with:
 1. **Start the Vercel development server:**
 
     ```shell
-    pnpm exec vercel dev
+    pnpm dlx vercel@59.13.1 dev
     ```
 
 The service will be available at `http://localhost:3000`.
@@ -726,14 +726,14 @@ This project is configured as a Vercel Node.js Function. `api/index.ts` exposes 
 1. **Authenticate and link the project:**
 
     ```shell
-    pnpm exec vercel login
-    pnpm exec vercel link
+    pnpm dlx vercel@59.13.1 login
+    pnpm dlx vercel@59.13.1 link
     ```
 
 1. **Create a preview deployment:**
 
     ```shell
-    pnpm exec vercel
+    pnpm dlx vercel@59.13.1
     ```
 
 1. **Verify the preview URL, then deploy to production:**

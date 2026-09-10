@@ -22,14 +22,13 @@
 		"node": "24.x"
 	},
 	"scripts": {
-		"deploy": "vercel --prod",
+		"deploy": "pnpm dlx vercel@59.13.1 --prod",
 		"typecheck": "tsc --noEmit && tsc -p api/tsconfig.json --noEmit",
 		"test": "vitest"
 	},
 	"devDependencies": {
 		"@types/node": "^24",
 		"typescript": "^7.0.2",
-		"vercel": "^59.13.1",
 		"vitest": "^4.0.0"
 	},
 	"dependencies": {
