@@ -68,6 +68,35 @@ describe('RFC 9421 HTTP Message Signatures - Required Headers Validation', () =>
 		expect(llms).toContain('Required covered components: @method, @path');
 		const mountedResponse = await worker.fetch(new Request('https://verifier.example/9421/llms.txt'), env, ctx);
 		expect(await mountedResponse.text()).toContain('Endpoint: https://verifier.example/9421/');
+
+		const mountedManifestResponse = await worker.fetch(
+			new Request('https://verifier.example/9421', { headers: { accept: 'application/json' } }),
+			env,
+			ctx
+		);
+		const mountedManifest = (await mountedManifestResponse.json()) as any;
+		expect(mountedManifest.endpoint).toBe('https://verifier.example/9421/');
+		expect(mountedManifest.llmsTxt).toBe('https://verifier.example/9421/llms.txt');
+	});
+
+	it('routes signed GET requests to signature verification', async () => {
+		const { env, ctx } = createTestEnv();
+		const request = new Request('https://verifier.example/resource', {
+			headers: {
+				accept: 'application/json',
+				signature: 'sig1=:dGVzdA==:',
+				'signature-input': 'sig1=("@method" "@path");alg="ed25519"',
+				'x-public-key-pem': 'not a public key',
+			},
+		});
+
+		const response = await worker.fetch(request, env, ctx);
+		const body = (await response.json()) as any;
+
+		expect(response.status).toBe(400);
+		expect(body).toHaveProperty('verified', false);
+		expect(body).toHaveProperty('error');
+		expect(body).not.toHaveProperty('endpoint');
 	});
 
 	it('rejects signatures that cover no request components', async () => {

@@ -53,10 +53,12 @@ export default {
 	 */
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		const url = new URL(request.url);
-		const baseUrl = new URL(
-			url.pathname.endsWith('/llms.txt') ? url.pathname.slice(0, -'llms.txt'.length) : url.pathname,
-			url.origin
-		).toString();
+		const basePath = url.pathname.endsWith('/llms.txt')
+			? url.pathname.slice(0, -'llms.txt'.length)
+			: url.pathname.endsWith('/')
+				? url.pathname
+				: `${url.pathname}/`;
+		const baseUrl = new URL(basePath, url.origin).toString();
 
 		if (request.method === 'GET' && url.pathname.endsWith('/llms.txt')) {
 			return new Response(createLlmsTxt(baseUrl), {
@@ -79,7 +81,12 @@ export default {
 			});
 		}
 
-		if (request.method === 'GET') {
+		if (
+			request.method === 'GET' &&
+			!request.headers.has('signature') &&
+			!request.headers.has('signature-input') &&
+			!request.headers.has('x-public-key-pem')
+		) {
 			return Response.json(createApiDescription(baseUrl), {
 				headers: { vary: 'Accept' },
 			});
