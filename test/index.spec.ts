@@ -13,8 +13,11 @@
  * PEM normalization logic, and response formats that can be tested in isolation.
  */
 
+import { generateKeyPairSync, sign } from 'node:crypto';
+import { appendSignature, createSignatureSync } from 'http-message-sig';
 import { describe, it, expect } from 'vitest';
 import worker from '../src/index';
+import { verifySignature } from '../src/verification';
 
 /**
  * Helper function to create test environment
@@ -29,9 +32,9 @@ function createTestEnv() {
 }
 
 describe('RFC 9421 HTTP Message Signatures - Required Headers Validation', () => {
-	it('serves the browser workbench without entering verification', async () => {
+	it('serves a robust browser workbench without entering verification', async () => {
 		const request = new Request('http://localhost:8787/', {
-			headers: { accept: 'text/html' },
+			headers: { accept: 'TEXT/HTML' },
 		});
 
 		const { env, ctx } = createTestEnv();
@@ -40,7 +43,34 @@ describe('RFC 9421 HTTP Message Signatures - Required Headers Validation', () =>
 
 		expect(response.status).toBe(200);
 		expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
+		expect(response.headers.get('vary')).toBe('Accept');
 		expect(body).toContain('RFC 9421 Signature Workbench');
+		expect(body).toContain("replace(/\\r?\\n/g,' ')");
+		expect(body).toContain('body:body||undefined');
+		expect(body).toContain('Additional signed headers');
+		expect(body).not.toContain('<code>hmac-sha256</code>');
+	});
+
+	it('rejects signatures that cover no request components', async () => {
+		const { privateKey, publicKey } = generateKeyPairSync('ed25519');
+		const request = new Request('https://example.com/verify', { method: 'POST' });
+		const fields = createSignatureSync(request, {
+			components: [],
+			parameters: { alg: 'ed25519' },
+			signer: {
+				algorithm: 'ed25519',
+				sign: (data) => sign(null, data, privateKey),
+			},
+		});
+		const signedRequest = new Request(request, { headers: appendSignature(request.headers, fields) });
+
+		const result = await verifySignature(
+			signedRequest,
+			publicKey.export({ type: 'spki', format: 'pem' }).toString()
+		);
+
+		expect(result.verified).toBe(false);
+		expect(result.error).toContain('@method');
 	});
 
 	it('should provide helpful error message structure', async () => {

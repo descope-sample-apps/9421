@@ -57,7 +57,7 @@ export async function verifySignature(request: Request, pemKey: string): Promise
 		await verifyHttpSignature(request, {
 			policy: {
 				algorithms: Object.keys(algorithmMap),
-				requiredComponents: [],
+				requiredComponents: ['@method', '@path'],
 				requiredParameters: ['alg'],
 			},
 			resolveVerifier(candidate: UntrustedSignatureCandidate): Verifier {

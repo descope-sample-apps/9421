@@ -64,6 +64,8 @@ export const homePage = `<!doctype html>
 			<textarea id="signature" required spellcheck="false" placeholder="sig1=:base64-signature:"></textarea>
 			<label for="key">Public key (PEM)</label>
 			<textarea id="key" required spellcheck="false" placeholder="-----BEGIN PUBLIC KEY-----&#10;…&#10;-----END PUBLIC KEY-----"></textarea>
+			<label for="headers">Additional signed headers (JSON object, optional)</label>
+			<textarea id="headers" spellcheck="false" placeholder='{"content-digest":"sha-256=:…:","x-request-id":"…"}'></textarea>
 			<label for="body">POST body (optional)</label>
 			<textarea id="body" spellcheck="false" placeholder='{"hello":"signed world"}'></textarea>
 			<button type="submit">Verify signature</button>
@@ -74,7 +76,7 @@ export const homePage = `<!doctype html>
 			<pre class="result" id="result">Ready. Supply the exact headers used to sign a POST request to this URL.</pre>
 		</section>
 
-		<div class="panel algorithms"><span class="label">accepted algorithms</span><code>ed25519</code><code>ecdsa-p256-sha256</code><code>ecdsa-p384-sha384</code><code>rsa-pss-sha512</code><code>rsa-v1_5-sha256</code><code>hmac-sha256</code></div>
+		<div class="panel algorithms"><span class="label">accepted algorithms</span><code>ed25519</code><code>ecdsa-p256-sha256</code><code>ecdsa-p384-sha384</code><code>rsa-pss-sha512</code><code>rsa-v1_5-sha256</code></div>
 	</section>
 	<footer><span>Built for implementation testing and protocol learning.</span><a href="https://www.rfc-editor.org/rfc/rfc9421.html">Read RFC 9421 ↗</a></footer>
 </main>
@@ -87,7 +89,10 @@ export const homePage = `<!doctype html>
 		const button=form.querySelector('button');
 		button.disabled=true; status.textContent='checking'; result.className='result'; result.textContent='Reconstructing signature base…';
 		try {
-			const response=await fetch(location.href,{method:'POST',headers:{'content-type':'application/json','signature-input':document.querySelector('#signature-input').value,'signature':document.querySelector('#signature').value,'x-public-key-pem':document.querySelector('#key').value},body:document.querySelector('#body').value||'{}'});
+			const additionalHeaders=JSON.parse(document.querySelector('#headers').value||'{}');
+			const headers={...additionalHeaders,'signature-input':document.querySelector('#signature-input').value,'signature':document.querySelector('#signature').value,'x-public-key-pem':document.querySelector('#key').value.replace(/\\r?\\n/g,' ')};
+			const body=document.querySelector('#body').value;
+			const response=await fetch(location.href,{method:'POST',headers,body:body||undefined});
 			const data=await response.json();
 			result.textContent=JSON.stringify(data,null,2); result.classList.add(data.verified?'good':'bad'); status.textContent=data.verified?'verified':'rejected';
 		} catch(error) {
