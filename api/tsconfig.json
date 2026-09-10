@@ -2,7 +2,8 @@
 	"extends": "../tsconfig.json",
 	"compilerOptions": {
 		"lib": ["es2024", "DOM"],
-		"types": []
+		"types": ["node"],
+		"typeRoots": ["../node_modules/@types"]
 	},
 	"include": ["./**/*.ts", "../src/**/*.ts"]
 }

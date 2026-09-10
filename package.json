@@ -23,6 +23,7 @@
 	},
 	"scripts": {
 		"deploy": "vercel --prod",
+		"typecheck": "tsc --noEmit && tsc -p api/tsconfig.json --noEmit",
 		"test": "vitest"
 	},
 	"devDependencies": {
