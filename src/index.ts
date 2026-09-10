@@ -147,7 +147,6 @@ export default {
 			 * - verified: true (signature passed verification)
 			 * - Signature: Echo of the Signature header (for debugging)
 			 * - Signature-Input: Echo of the Signature-Input header (for debugging)
-			 * - pemKey: Echo of the public key (for debugging)
 			 *
 			 * ⚠️ PRODUCTION WARNING:
 			 * Echoing keys and signatures helps attackers analyze your system.
@@ -158,7 +157,6 @@ export default {
 					verified: true,
 					Signature: request.headers.get('Signature'),
 					'Signature-Input': request.headers.get('Signature-Input'),
-					pemKey,
 				},
 				{ status: 200 }
 			);
@@ -173,8 +171,8 @@ export default {
 			 * - "Missing Signature header": No Signature header in request
 			 * - "Missing Signature-Input header": No Signature-Input header in request
 			 *
-			 * The response includes the signature headers and public key to help
-			 * developers debug their signature generation code.
+			 * The response includes the signature headers to help developers debug
+			 * their signature generation code. Public-key input is never echoed.
 			 *
 			 * ⚠️ PRODUCTION WARNING:
 			 * Detailed error messages help attackers probe your system.
@@ -186,7 +184,6 @@ export default {
 					error: result.error,
 					Signature: request.headers.get('Signature'),
 					'Signature-Input': request.headers.get('Signature-Input'),
-					pemKey,
 				},
 				{ status: 400 }
 			);

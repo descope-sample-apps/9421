@@ -225,7 +225,6 @@ curl -X POST https://your-service.example.com/ \
 | **Ed25519**     | `ed25519`           | N/A (built-in) | Edwards Curve  | 256-bit   |
 | **RSA PSS**     | `rsa-pss-sha512`    | SHA-512        | RSA            | 2048+ bit |
 | **RSA v1.5**    | `rsa-v1_5-sha256`   | SHA-256        | RSA            | 2048+ bit |
-| **HMAC**        | `hmac-sha256`       | SHA-256        | Symmetric      | 256+ bit  |
 
 ### Algorithm Notes
 
@@ -233,7 +232,8 @@ curl -X POST https://your-service.example.com/ \
 - **Ed25519**: Fastest signature verification. No hash algorithm needed (uses built-in SHA-512).
 - **RSA PSS**: More secure than RSA v1.5. Use SHA-512 for better security.
 - **RSA v1.5**: Legacy algorithm. Use PSS instead for new implementations.
-- **HMAC**: Symmetric key algorithm. Both client and server share the same secret.
+
+Algorithm names are bound to their required key type and curve. RSA-PSS uses SHA-512 with a 64-byte salt; RSA v1.5 uses PKCS#1 v1.5 padding.
 
 ### Key Generation Quick Reference
 

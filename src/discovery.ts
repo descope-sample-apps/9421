@@ -8,9 +8,11 @@ export function createApiDescription(baseUrl: string) {
 		requiredHeaders: {
 			Signature: 'RFC 9421 Signature field',
 			'Signature-Input': 'RFC 9421 Signature-Input field',
-			'x-public-key-pem': 'PEM public key; line breaks may be replaced with spaces',
+			'x-public-key-pem': 'SPKI PUBLIC KEY PEM; line breaks may be replaced with spaces',
 		},
 		requiredCoveredComponents: ['@method', '@path'],
+		bodyRequirements: 'Requests with a body must include a valid, signed Content-Digest using sha-256 or sha-512',
+		multipleSignatures: 'Set x-signature-label to the Signature-Input label to verify',
 		algorithms: ['ed25519', 'ecdsa-p256-sha256', 'ecdsa-p384-sha384', 'rsa-pss-sha512', 'rsa-v1_5-sha256'],
 		responses: {
 			'200': { verified: true },
@@ -34,7 +36,8 @@ export function createLlmsTxt(baseUrl: string): string {
 - Method: POST
 - Required headers: Signature, Signature-Input, x-public-key-pem
 - Required covered components: @method, @path
-- Optional: request body and any additional headers covered by the signature
+- Optional body: requires a signed Content-Digest header using sha-256 or sha-512
+- Multiple signatures: set x-signature-label to the Signature-Input label to verify
 - Success: HTTP 200 with {"verified":true,...}
 - Failure: HTTP 400 with {"verified":false,"error":"...",...}
 
@@ -48,7 +51,7 @@ export function createLlmsTxt(baseUrl: string): string {
 ## Constraints
 
 - Demo and testing only
-- Public keys are supplied by the caller
+- Public keys are supplied by the caller as SPKI PUBLIC KEY PEM (private-key PEM is rejected)
 - Supported algorithms: ed25519, ecdsa-p256-sha256, ecdsa-p384-sha384, rsa-pss-sha512, rsa-v1_5-sha256
 `;
 }

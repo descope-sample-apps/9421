@@ -27,11 +27,9 @@
  * - ed25519: EdDSA with Curve25519 (SHA-512 built-in)
  * - rsa-pss-sha512: RSA-PSS with SHA-512 hash
  * - rsa-v1_5-sha256: RSA PKCS#1 v1.5 with SHA-256 hash
- * - hmac-sha256: HMAC with SHA-256 hash
  */
 export const algorithmMap = {
 	ed25519: null, // Ed25519 uses SHA-512 internally, no explicit hash needed
-	'hmac-sha256': 'sha256',
 	'rsa-pss-sha512': 'sha512',
 	'rsa-v1_5-sha256': 'sha256',
 	'ecdsa-p384-sha384': 'sha384',
