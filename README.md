@@ -706,81 +706,51 @@ Always with:
 1. **Install dependencies:**
 
     ```shell
-    npm install
-    # or
     pnpm install
     ```
 
-1. **Start local dev server:**
+1. **Start the Vercel development server:**
 
     ```shell
-    $ npm run dev
-    # or
-    $ pnpm dev
+    pnpm dev
     ```
 
-The service will be available at `http://localhost:8787`
+    The first run may ask you to authenticate and link a Vercel project. For a local server without Vercel project setup, use `pnpm start` instead.
+
+The service will be available at `http://localhost:3000`.
 
 Open that URL in a browser to use the interactive verification workbench. Programmatic clients can send signed requests directly to the same URL.
 
-1. **Test locally:**
-
-    ```shell
-    # Generate test keys
-    openssl ecparam -name prime256v1 -genkey -noout -out test-private.pem
-    openssl ec -in test-private.pem -pubout -out test-public.pem
-
-    # Use your signing library to test against localhost:8787
-    ```
-
 ### Deployment
 
-This project includes configuration for deployment to Cloudflare Workers via Wrangler, but can be adapted to other platforms.
+This project is configured as a Vercel Node.js application. `src/server.ts` is the server entrypoint; it preserves the original request method, path, headers, and body required for RFC 9421 verification.
 
-#### Cloudflare Workers Deployment
+1. **Authenticate and link the project:**
 
-1. **Configure Wrangler:**
+    ```shell
+    pnpm exec vercel login
+    pnpm exec vercel link
+    ```
 
-Edit `wrangler.jsonc` to set your worker name:
+1. **Create a preview deployment:**
 
-```jsonc
-{
-   "name": "your-worker-name",
-   "main": "src/index.ts",
-   "compatibility_date": "2025-12-19"
-}
-```
+    ```shell
+    pnpm exec vercel
+    ```
 
-1. **Deploy to Cloudflare:**
+1. **Verify the preview URL, then deploy to production:**
 
-```shell
-npm run deploy
-# or
-pnpm deploy
-```
+    ```shell
+    pnpm deploy
+    ```
 
-1. **Test deployment:**
+1. **Move the custom domain:** Add `9421.guru` to the Vercel project, verify the preview deployment, then replace the existing Cloudflare DNS target with the records Vercel provides.
 
-```shell
-curl https://your-worker-name.workers.dev/
-```
-
-#### Alternative Platforms
-
-This service can be deployed to any platform supporting Node.js-compatible runtimes:
-
-- **Node.js servers** - Express, Fastify, etc.
-- **Serverless platforms** - AWS Lambda, Google Cloud Functions, Azure Functions
-- **Edge runtimes** - Vercel Edge, Deno Deploy, Fastly Compute
-- **Container platforms** - Docker, Kubernetes
-
-Adapt the `fetch` handler to your platform's request/response format.
+No environment variables or managed data services are required by this demo.
 
 ### Testing
 
 ```shell
-npm test
-# or
 pnpm test
 ```
 
@@ -789,14 +759,15 @@ pnpm test
 ```shell
 .
 ├── src/
-│   ├── index.ts          # Main request handler
+│   ├── server.ts         # Vercel Node.js server entrypoint
+│   ├── index.ts          # Platform-neutral request handler
 │   ├── verification.ts   # Signature verification logic
 │   ├── config.ts         # Configuration and constants
 │   ├── home.ts           # Interactive verification workbench
 │   └── utils.ts          # Utility functions
 ├── test/
 │   └── index.spec.ts     # Test suite
-├── wrangler.jsonc        # Cloudflare Workers config (optional)
+├── vercel.json           # Vercel project configuration
 ├── package.json          # Dependencies and scripts
 ├── tsconfig.json         # TypeScript configuration
 └── README.md             # This file
@@ -804,11 +775,9 @@ pnpm test
 
 ### Environment
 
-- **Runtime:** Compatible with Node.js and edge runtimes
-- **Node.js Compatibility:** Uses Node.js `crypto` module
+- **Runtime:** Vercel Functions with Node.js 24
+- **Cryptography:** Node.js `crypto`
 - **TypeScript:** Fully typed with `@types/node`
-
-Note: This project includes Cloudflare Workers configuration (`wrangler.jsonc`) but can run on any Node.js-compatible platform.
 
 ---
 
@@ -826,9 +795,8 @@ Note: This project includes Cloudflare Workers configuration (`wrangler.jsonc`) 
 
 ### Related Tools & Platforms
 
-- **[Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/)** - For Cloudflare Workers deployment (optional)
-- **[Express.js](https://expressjs.com/)** - For traditional Node.js server deployment
-- **[Fastify](https://www.fastify.io/)** - High-performance Node.js web framework
+- **[Vercel Functions](https://vercel.com/docs/functions)** - Node.js function hosting
+- **[Vercel CLI](https://vercel.com/docs/cli)** - Local development and deployment
 
 ### Cryptography
 

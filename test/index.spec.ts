@@ -16,20 +16,8 @@
 import { constants, createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { appendSignature, createSignatureSync } from 'http-message-sig';
 import { describe, it, expect } from 'vitest';
-import worker from '../src/index';
+import { handleRequest } from '../src/index';
 import { verifySignature } from '../src/verification';
-
-/**
- * Helper function to create test environment
- */
-function createTestEnv() {
-	const env = {} as Env;
-	const ctx = {
-		waitUntil: () => {},
-		passThroughOnException: () => {},
-	} as ExecutionContext;
-	return { env, ctx };
-}
 
 describe('RFC 9421 HTTP Message Signatures - Required Headers Validation', () => {
 	it('serves a robust browser workbench without entering verification', async () => {
@@ -37,8 +25,7 @@ describe('RFC 9421 HTTP Message Signatures - Required Headers Validation', () =>
 			headers: { accept: 'TEXT/HTML' },
 		});
 
-		const { env, ctx } = createTestEnv();
-		const response = await worker.fetch(request, env, ctx);
+		const response = await handleRequest(request);
 		const body = await response.text();
 
 		expect(response.status).toBe(200);
@@ -58,34 +45,26 @@ describe('RFC 9421 HTTP Message Signatures - Required Headers Validation', () =>
 	});
 
 	it('publishes agent-readable API discovery resources', async () => {
-		const { env, ctx } = createTestEnv();
-		const manifestResponse = await worker.fetch(
-			new Request('https://verifier.example/', { headers: { accept: 'application/json' } }), env, ctx
-		);
+		const manifestResponse = await handleRequest(new Request('https://verifier.example/', { headers: { accept: 'application/json' } }));
 		const manifest = (await manifestResponse.json()) as any;
 		expect(manifest.endpoint).toBe('https://verifier.example/');
 		expect(manifest.requiredCoveredComponents).toEqual(['@method', '@path']);
 		expect(manifest.llmsTxt).toBe('https://verifier.example/llms.txt');
-		const llmsResponse = await worker.fetch(new Request('https://verifier.example/llms.txt'), env, ctx);
+		const llmsResponse = await handleRequest(new Request('https://verifier.example/llms.txt'));
 		const llms = await llmsResponse.text();
 		expect(llmsResponse.headers.get('content-type')).toBe('text/plain; charset=utf-8');
 		expect(llms).toContain('# 9421 Guru — RFC 9421 Registered Message Verifier');
 		expect(llms).toContain('Required covered components: @method, @path');
-		const mountedResponse = await worker.fetch(new Request('https://verifier.example/9421/llms.txt'), env, ctx);
+		const mountedResponse = await handleRequest(new Request('https://verifier.example/9421/llms.txt'));
 		expect(await mountedResponse.text()).toContain('Endpoint: https://verifier.example/9421/');
 
-		const mountedManifestResponse = await worker.fetch(
-			new Request('https://verifier.example/9421', { headers: { accept: 'application/json' } }),
-			env,
-			ctx
-		);
+		const mountedManifestResponse = await handleRequest(new Request('https://verifier.example/9421', { headers: { accept: 'application/json' } }));
 		const mountedManifest = (await mountedManifestResponse.json()) as any;
 		expect(mountedManifest.endpoint).toBe('https://verifier.example/9421/');
 		expect(mountedManifest.llmsTxt).toBe('https://verifier.example/9421/llms.txt');
 	});
 
 	it('routes signed GET requests to signature verification', async () => {
-		const { env, ctx } = createTestEnv();
 		const request = new Request('https://verifier.example/resource', {
 			headers: {
 				accept: 'text/html',
@@ -95,7 +74,7 @@ describe('RFC 9421 HTTP Message Signatures - Required Headers Validation', () =>
 			},
 		});
 
-		const response = await worker.fetch(request, env, ctx);
+		const response = await handleRequest(request);
 		const body = (await response.json()) as any;
 
 		expect(response.status).toBe(400);
@@ -133,8 +112,7 @@ describe('RFC 9421 HTTP Message Signatures - Required Headers Validation', () =>
 			method: 'POST',
 		});
 
-		const { env, ctx } = createTestEnv();
-		const response = await worker.fetch(request, env, ctx);
+		const response = await handleRequest(request);
 		const data = (await response.json()) as any;
 
 		// Verify the error response has all necessary fields for debugging
@@ -160,8 +138,7 @@ describe('RFC 9421 HTTP Message Signatures - PEM Format Handling', () => {
 			body: 'test message',
 		});
 
-		const { env, ctx } = createTestEnv();
-		const response = await worker.fetch(request, env, ctx);
+		const response = await handleRequest(request);
 		const data = (await response.json()) as any;
 
 		expect(response.status).toBe(400);
@@ -185,8 +162,7 @@ describe('RFC 9421 HTTP Message Signatures - PEM Format Handling', () => {
 			body: 'test message',
 		});
 
-		const { env, ctx } = createTestEnv();
-		const response = await worker.fetch(request, env, ctx);
+		const response = await handleRequest(request);
 		const data = (await response.json()) as any;
 
 		expect(response.status).toBe(400);
@@ -210,8 +186,7 @@ describe('RFC 9421 HTTP Message Signatures - PEM Format Handling', () => {
 			body: 'test message',
 		});
 
-		const { env, ctx } = createTestEnv();
-		const response = await worker.fetch(request, env, ctx);
+		const response = await handleRequest(request);
 		const data = (await response.json()) as any;
 
 		expect(response.status).toBe(400);
@@ -238,8 +213,7 @@ describe('RFC 9421 HTTP Message Signatures - Response Format', () => {
 			body: 'test message',
 		});
 
-		const { env, ctx } = createTestEnv();
-		const response = await worker.fetch(request, env, ctx);
+		const response = await handleRequest(request);
 		const data = (await response.json()) as any;
 
 		expect(response.status).toBe(400);
@@ -270,8 +244,7 @@ describe('RFC 9421 HTTP Message Signatures - Response Format', () => {
 			body: 'test',
 		});
 
-		const { env, ctx } = createTestEnv();
-		const response = await worker.fetch(request, env, ctx);
+		const response = await handleRequest(request);
 		const data = (await response.json()) as any;
 
 		expect(data.Signature).toBe(testSig);
@@ -298,8 +271,7 @@ describe('RFC 9421 HTTP Message Signatures - Edge Cases', () => {
 			body: 'test message',
 		});
 
-		const { env, ctx } = createTestEnv();
-		const response = await worker.fetch(request, env, ctx);
+		const response = await handleRequest(request);
 		const data = (await response.json()) as any;
 
 		expect(response.status).toBe(400);
@@ -324,8 +296,7 @@ describe('RFC 9421 HTTP Message Signatures - Edge Cases', () => {
 			body: 'test message',
 		});
 
-		const { env, ctx } = createTestEnv();
-		const response = await worker.fetch(request, env, ctx);
+		const response = await handleRequest(request);
 		const data = (await response.json()) as any;
 
 		expect(response.status).toBe(400);
@@ -349,8 +320,7 @@ describe('RFC 9421 HTTP Message Signatures - Edge Cases', () => {
 			body: 'test message',
 		});
 
-		const { env, ctx } = createTestEnv();
-		const response = await worker.fetch(request, env, ctx);
+		const response = await handleRequest(request);
 		const data = (await response.json()) as any;
 
 		expect(response.status).toBe(400);
@@ -374,8 +344,7 @@ describe('RFC 9421 HTTP Message Signatures - Edge Cases', () => {
 			body: 'test message',
 		});
 
-		const { env, ctx } = createTestEnv();
-		const response = await worker.fetch(request, env, ctx);
+		const response = await handleRequest(request);
 		const data = (await response.json()) as any;
 
 		expect(response.status).toBe(400);
@@ -393,8 +362,7 @@ describe('RFC 9421 HTTP Message Signatures - Error Message Quality', () => {
 			body: 'test',
 		});
 
-		const { env, ctx } = createTestEnv();
-		const response = await worker.fetch(request, env, ctx);
+		const response = await handleRequest(request);
 		const data = (await response.json()) as any;
 
 		expect(data.error).toBe('Missing x-public-key-pem header');
@@ -417,8 +385,7 @@ describe('RFC 9421 HTTP Message Signatures - Error Message Quality', () => {
 			body: 'test',
 		});
 
-		const { env, ctx } = createTestEnv();
-		const response = await worker.fetch(request, env, ctx);
+		const response = await handleRequest(request);
 		const data = (await response.json()) as any;
 
 		expect(data.error).toMatch(/Failed to parse public key|Only SPKI PUBLIC KEY PEM/);
@@ -442,8 +409,7 @@ describe('RFC 9421 HTTP Message Signatures - Error Message Quality', () => {
 			body: 'test',
 		});
 
-		const { env, ctx } = createTestEnv();
-		const response = await worker.fetch(request, env, ctx);
+		const response = await handleRequest(request);
 		const data = (await response.json()) as any;
 
 		// Verify all debugging fields are present
@@ -473,8 +439,7 @@ describe('RFC 9421 HTTP Message Signatures - Algorithm Support', () => {
 			body: 'test message',
 		});
 
-		const { env, ctx } = createTestEnv();
-		const response = await worker.fetch(request, env, ctx);
+		const response = await handleRequest(request);
 		const data = (await response.json()) as any;
 
 		expect(response.status).toBe(400);
@@ -543,8 +508,7 @@ describe('RFC 9421 HTTP Message Signatures - Security invariants', () => {
 		const privatePem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
 		const headerPrivatePem = privatePem.replace(/\r?\n/g, ' ');
 		const request = new Request('https://example.com/verify', { method: 'POST', headers: { 'x-public-key-pem': headerPrivatePem, signature: 'sig1=:AAAA:', 'signature-input': 'sig1=("@method" "@path");alg="ed25519"' } });
-		const { env, ctx } = createTestEnv();
-		const data = (await (await worker.fetch(request, env, ctx)).json()) as any;
+		const data = (await (await handleRequest(request)).json()) as any;
 		expect(data.verified).toBe(false);
 		expect(data.error).toContain('Only SPKI PUBLIC KEY PEM');
 		expect(JSON.stringify(data)).not.toContain(headerPrivatePem);

@@ -33,160 +33,150 @@ import { createApiDescription, createLlmsTxt } from './discovery';
 import { homePage } from './home';
 import { verifySignature } from './verification';
 
-export default {
+/**
+ * Main request handler for HTTP Message Signature verification.
+ *
+ * This handler routes requests to appropriate handlers:
+ * - OPTIONS: CORS preflight
+ * - GET: Interactive web UI
+ * - POST: Signature verification
+ *
+ * ⚠️ SECURITY WARNING:
+ * This accepts public keys from request headers, which is ONLY appropriate
+ * for demo/testing. In production, keys MUST be stored and managed server-side.
+ *
+ * @param request - Incoming HTTP request
+ * @returns JSON response with verification results or HTML for web UI
+ */
+export async function handleRequest(request: Request): Promise<Response> {
+	const url = new URL(request.url);
+	const basePath = url.pathname.endsWith('/llms.txt')
+		? url.pathname.slice(0, -'llms.txt'.length)
+		: url.pathname.endsWith('/')
+		? url.pathname
+		: `${url.pathname}/`;
+	const baseUrl = new URL(basePath, url.origin).toString();
+	const hasSignatureMaterial =
+		request.headers.has('signature') || request.headers.has('signature-input') || request.headers.has('x-public-key-pem');
+
+	if (request.method === 'GET' && url.pathname.endsWith('/llms.txt')) {
+		return new Response(createLlmsTxt(baseUrl), {
+			headers: {
+				'content-type': 'text/plain; charset=utf-8',
+				'cache-control': 'public, max-age=3600',
+			},
+		});
+	}
+
+	if (request.method === 'GET' && !hasSignatureMaterial && request.headers.get('accept')?.toLowerCase().includes('text/html')) {
+		return new Response(homePage, {
+			headers: {
+				'content-type': 'text/html; charset=utf-8',
+				'content-security-policy':
+					"default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+				'x-content-type-options': 'nosniff',
+				vary: 'Accept',
+			},
+		});
+	}
+
+	if (request.method === 'GET' && !hasSignatureMaterial) {
+		return Response.json(createApiDescription(baseUrl), {
+			headers: { vary: 'Accept' },
+		});
+	}
+
 	/**
-	 * Main request handler for HTTP Message Signature verification.
+	 * Extract public key from request header.
 	 *
-	 * This handler routes requests to appropriate handlers:
-	 * - OPTIONS: CORS preflight
-	 * - GET: Interactive web UI
-	 * - POST: Signature verification
+	 * ⚠️ DEMO ONLY: In production, retrieve keys from server-side storage!
 	 *
-	 * ⚠️ SECURITY WARNING:
-	 * This accepts public keys from request headers, which is ONLY appropriate
-	 * for demo/testing. In production, keys MUST be stored and managed server-side.
-	 *
-	 * @param request - Incoming HTTP request
-	 * @param env - Environment bindings (platform-specific)
-	 * @param ctx - Execution context (platform-specific)
-	 * @returns JSON response with verification results or HTML for web UI
+	 * The x-public-key-pem header allows clients to provide their own
+	 * public key for signature verification. This is useful for testing
+	 * but defeats authentication in production environments.
 	 */
-	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-		const url = new URL(request.url);
-		const basePath = url.pathname.endsWith('/llms.txt')
-			? url.pathname.slice(0, -'llms.txt'.length)
-			: url.pathname.endsWith('/')
-				? url.pathname
-				: `${url.pathname}/`;
-		const baseUrl = new URL(basePath, url.origin).toString();
-		const hasSignatureMaterial =
-			request.headers.has('signature') ||
-			request.headers.has('signature-input') ||
-			request.headers.has('x-public-key-pem');
+	const pemKey = request.headers.get('x-public-key-pem');
 
-		if (request.method === 'GET' && url.pathname.endsWith('/llms.txt')) {
-			return new Response(createLlmsTxt(baseUrl), {
-				headers: {
-					'content-type': 'text/plain; charset=utf-8',
-					'cache-control': 'public, max-age=3600',
-				},
-			});
-		}
-
-		if (
-			request.method === 'GET' &&
-			!hasSignatureMaterial &&
-			request.headers.get('accept')?.toLowerCase().includes('text/html')
-		) {
-			return new Response(homePage, {
-				headers: {
-					'content-type': 'text/html; charset=utf-8',
-					'content-security-policy':
-						"default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
-					'x-content-type-options': 'nosniff',
-					vary: 'Accept',
-				},
-			});
-		}
-
-		if (request.method === 'GET' && !hasSignatureMaterial) {
-			return Response.json(createApiDescription(baseUrl), {
-				headers: { vary: 'Accept' },
-			});
-		}
-
+	if (!pemKey) {
 		/**
-		 * Extract public key from request header.
+		 * Helpful error response when public key is missing.
 		 *
-		 * ⚠️ DEMO ONLY: In production, retrieve keys from server-side storage!
+		 * Provides:
+		 * - Clear error message
+		 * - Example header format
+		 * - Key generation commands for common algorithms
 		 *
-		 * The x-public-key-pem header allows clients to provide their own
-		 * public key for signature verification. This is useful for testing
-		 * but defeats authentication in production environments.
+		 * This assists developers in getting started quickly.
 		 */
-		const pemKey = request.headers.get('x-public-key-pem');
+		return Response.json(
+			{
+				error: 'Missing x-public-key-pem header',
+				message: 'Please provide the public key in PEM format via the x-public-key-pem header',
+				example: 'x-public-key-pem: -----BEGIN PUBLIC KEY----- MHYwEAYH... -----END PUBLIC KEY-----',
+				keyGenerationCommands,
+			},
+			{ status: 400 }
+		);
+	}
 
-		if (!pemKey) {
-			/**
-			 * Helpful error response when public key is missing.
-			 *
-			 * Provides:
-			 * - Clear error message
-			 * - Example header format
-			 * - Key generation commands for common algorithms
-			 *
-			 * This assists developers in getting started quickly.
-			 */
-			return Response.json(
-				{
-					error: 'Missing x-public-key-pem header',
-					message: 'Please provide the public key in PEM format via the x-public-key-pem header',
-					example: 'x-public-key-pem: -----BEGIN PUBLIC KEY----- MHYwEAYH... -----END PUBLIC KEY-----',
-					keyGenerationCommands,
-				},
-				{ status: 400 }
-			);
-		}
+	/**
+	 * Verify the HTTP message signature.
+	 *
+	 * The verifySignature function handles:
+	 * 1. PEM key normalization
+	 * 2. RFC 9421 signature verification
+	 * 3. Cryptographic validation
+	 * 4. Error handling
+	 */
+	const result = await verifySignature(request, pemKey);
 
+	if (result.verified) {
 		/**
-		 * Verify the HTTP message signature.
+		 * Success response with verification details.
 		 *
-		 * The verifySignature function handles:
-		 * 1. PEM key normalization
-		 * 2. RFC 9421 signature verification
-		 * 3. Cryptographic validation
-		 * 4. Error handling
+		 * Returns:
+		 * - verified: true (signature passed verification)
+		 * - Signature: Echo of the Signature header (for debugging)
+		 * - Signature-Input: Echo of the Signature-Input header (for debugging)
+		 *
+		 * ⚠️ PRODUCTION WARNING:
+		 * Echoing keys and signatures helps attackers analyze your system.
+		 * In production, return minimal success responses (e.g., just {"verified": true})
 		 */
-		const result = await verifySignature(request, pemKey);
-
-		if (result.verified) {
-			/**
-			 * Success response with verification details.
-			 *
-			 * Returns:
-			 * - verified: true (signature passed verification)
-			 * - Signature: Echo of the Signature header (for debugging)
-			 * - Signature-Input: Echo of the Signature-Input header (for debugging)
-			 *
-			 * ⚠️ PRODUCTION WARNING:
-			 * Echoing keys and signatures helps attackers analyze your system.
-			 * In production, return minimal success responses (e.g., just {"verified": true})
-			 */
-			return Response.json(
-				{
-					verified: true,
-					Signature: request.headers.get('Signature'),
-					'Signature-Input': request.headers.get('Signature-Input'),
-				},
-				{ status: 200 }
-			);
-		} else {
-			/**
-			 * Error response with detailed debugging information.
-			 *
-			 * Common errors:
-			 * - "Invalid signature": Signature doesn't match (wrong key, tampered data)
-			 * - "Failed to parse public key": Invalid PEM format
-			 * - "Unsupported or missing algorithm": Invalid or missing 'alg' parameter
-			 * - "Missing Signature header": No Signature header in request
-			 * - "Missing Signature-Input header": No Signature-Input header in request
-			 *
-			 * The response includes the signature headers to help developers debug
-			 * their signature generation code. Public-key input is never echoed.
-			 *
-			 * ⚠️ PRODUCTION WARNING:
-			 * Detailed error messages help attackers probe your system.
-			 * In production, return generic errors (e.g., "Verification failed")
-			 */
-			return Response.json(
-				{
-					verified: false,
-					error: result.error,
-					Signature: request.headers.get('Signature'),
-					'Signature-Input': request.headers.get('Signature-Input'),
-				},
-				{ status: 400 }
-			);
-		}
-	},
-} satisfies ExportedHandler<Env>;
+		return Response.json(
+			{
+				verified: true,
+				Signature: request.headers.get('Signature'),
+				'Signature-Input': request.headers.get('Signature-Input'),
+			},
+			{ status: 200 }
+		);
+	} else {
+		/**
+		 * Error response with detailed debugging information.
+		 *
+		 * Common errors:
+		 * - "Invalid signature": Signature doesn't match (wrong key, tampered data)
+		 * - "Failed to parse public key": Invalid PEM format
+		 * - "Unsupported or missing algorithm": Invalid or missing 'alg' parameter
+		 * - "Missing Signature header": No Signature header in request
+		 * - "Missing Signature-Input header": No Signature-Input header in request
+		 *
+		 * The response includes the signature headers to help developers debug
+		 * their signature generation code. Public-key input is never echoed.
+		 *
+		 * ⚠️ PRODUCTION WARNING:
+		 * Detailed error messages help attackers probe your system.
+		 * In production, return generic errors (e.g., "Verification failed")
+		 */
+		return Response.json(
+			{
+				verified: false,
+				error: result.error,
+				Signature: request.headers.get('Signature'),
+				'Signature-Input': request.headers.get('Signature-Input'),
+			},
+			{ status: 400 }
+		);
+	}
+}
