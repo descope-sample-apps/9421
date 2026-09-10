@@ -29,6 +29,7 @@
  */
 
 import { keyGenerationCommands } from './config';
+import { createApiDescription, createLlmsTxt } from './discovery';
 import { homePage } from './home';
 import { verifySignature } from './verification';
 
@@ -51,6 +52,21 @@ export default {
 	 * @returns JSON response with verification results or HTML for web UI
 	 */
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+		const url = new URL(request.url);
+		const baseUrl = new URL(
+			url.pathname.endsWith('/llms.txt') ? url.pathname.slice(0, -'llms.txt'.length) : url.pathname,
+			url.origin
+		).toString();
+
+		if (request.method === 'GET' && url.pathname.endsWith('/llms.txt')) {
+			return new Response(createLlmsTxt(baseUrl), {
+				headers: {
+					'content-type': 'text/plain; charset=utf-8',
+					'cache-control': 'public, max-age=3600',
+				},
+			});
+		}
+
 		if (request.method === 'GET' && request.headers.get('accept')?.toLowerCase().includes('text/html')) {
 			return new Response(homePage, {
 				headers: {
@@ -60,6 +76,12 @@ export default {
 					'x-content-type-options': 'nosniff',
 					vary: 'Accept',
 				},
+			});
+		}
+
+		if (request.method === 'GET') {
+			return Response.json(createApiDescription(baseUrl), {
+				headers: { vary: 'Accept' },
 			});
 		}
 
