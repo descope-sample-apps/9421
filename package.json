@@ -29,7 +29,7 @@
 	"devDependencies": {
 		"@types/node": "^24",
 		"typescript": "^7.0.2",
-		"vitest": "^4.0.0"
+		"vitest": "^5.0.0"
 	},
 	"dependencies": {
 		"http-message-sig": "^0.3.0"
