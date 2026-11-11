@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       - name: Setup mise
-        uses: jdx/mise-action@146a28175021df8ca24f8ee1828cc2a60f980bd5 # v3
+        uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
