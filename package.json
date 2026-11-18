@@ -19,7 +19,7 @@
 	"private": true,
 	"type": "module",
 	"engines": {
-		"node": "24.x"
+		"node": "26.x"
 	},
 	"scripts": {
 		"deploy": "vercel --prod",
